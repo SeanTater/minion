@@ -15,6 +15,13 @@ struct CameraFollow {
     offset: Vec3,
 }
 
+#[derive(Component)]
+struct Enemy {
+    speed: f32,
+    health: i32,
+    chase_distance: f32,
+}
+
 #[derive(Resource)]
 struct ObjectPool<T: Component> {
     available: Vec<Entity>,
@@ -40,8 +47,9 @@ fn main() {
             }),
             ..default()
         }))
-        .add_systems(Startup, (setup_scene, spawn_player))
-        .add_systems(Update, (handle_mouse_clicks, move_player, follow_camera))
+        .init_resource::<ObjectPool<Enemy>>()
+        .add_systems(Startup, (setup_scene, spawn_player, spawn_enemies))
+        .add_systems(Update, (handle_mouse_clicks, move_player, follow_camera, enemy_ai, combat_system))
         .run();
 }
 
@@ -179,6 +187,104 @@ fn follow_camera(
             let target_pos = player_transform.translation + follow.offset;
             camera_transform.translation = target_pos;
             camera_transform.look_at(player_transform.translation, Vec3::Y);
+        }
+    }
+}
+
+fn spawn_enemies(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let spawn_positions = [
+        Vec3::new(5.0, 1.0, 5.0),
+        Vec3::new(-5.0, 1.0, 5.0),  
+        Vec3::new(5.0, 1.0, -5.0),
+        Vec3::new(-5.0, 1.0, -5.0),
+        Vec3::new(0.0, 1.0, 8.0),
+    ];
+
+    for pos in spawn_positions {
+        commands.spawn((
+            PbrBundle {
+                mesh: meshes.add(Sphere::new(0.5)),
+                material: materials.add(StandardMaterial {
+                    base_color: Color::srgb(0.8, 0.1, 0.1),
+                    ..default()
+                }),
+                transform: Transform::from_translation(pos),
+                ..default()
+            },
+            Enemy {
+                speed: 3.0,
+                health: 3,
+                chase_distance: 8.0,
+            },
+        ));
+    }
+}
+
+fn enemy_ai(
+    mut enemy_query: Query<(&mut Transform, &Enemy), (With<Enemy>, Without<Player>)>,
+    player_query: Query<&Transform, (With<Player>, Without<Enemy>)>,
+    time: Res<Time>,
+) {
+    if let Ok(player_transform) = player_query.get_single() {
+        for (mut enemy_transform, enemy) in enemy_query.iter_mut() {
+            let distance = enemy_transform.translation.distance(player_transform.translation);
+            
+            if distance <= enemy.chase_distance && distance > 1.0 {
+                let direction = (player_transform.translation - enemy_transform.translation).normalize();
+                enemy_transform.translation += direction * enemy.speed * time.delta_seconds();
+                enemy_transform.look_to(direction, Vec3::Y);
+            }
+        }
+    }
+}
+
+fn combat_system(
+    mut commands: Commands,
+    mut enemy_query: Query<(Entity, &mut Transform, &mut Enemy), With<Enemy>>,
+    player_query: Query<&Transform, (With<Player>, Without<Enemy>)>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    time: Res<Time>,
+) {
+    if let Ok(player_transform) = player_query.get_single() {
+        for (entity, enemy_transform, mut enemy) in enemy_query.iter_mut() {
+            let distance = enemy_transform.translation.distance(player_transform.translation);
+            
+            if distance <= 1.2 {
+                enemy.health -= 1;
+                
+                if enemy.health <= 0 {
+                    commands.entity(entity).despawn();
+                    
+                    // Respawn enemy at random position
+                    let respawn_pos = Vec3::new(
+                        (time.elapsed_seconds().sin() * 8.0) as f32,
+                        1.0,
+                        (time.elapsed_seconds().cos() * 8.0) as f32,
+                    );
+                    
+                    commands.spawn((
+                        PbrBundle {
+                            mesh: meshes.add(Sphere::new(0.5)),
+                            material: materials.add(StandardMaterial {
+                                base_color: Color::srgb(0.8, 0.1, 0.1),
+                                ..default()
+                            }),
+                            transform: Transform::from_translation(respawn_pos),
+                            ..default()
+                        },
+                        Enemy {
+                            speed: 3.0,
+                            health: 3,
+                            chase_distance: 8.0,
+                        },
+                    ));
+                }
+            }
         }
     }
 }
