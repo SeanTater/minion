@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
+use std::f32::consts::TAU;
 
 #[derive(Component)]
 struct Player {
@@ -44,6 +45,11 @@ struct ObjectPool<T: Component> {
     _phantom: std::marker::PhantomData<T>,
 }
 
+#[derive(Resource)]
+struct RespawnCounter {
+    count: u32,
+}
+
 impl<T: Component> Default for ObjectPool<T> {
     fn default() -> Self {
         Self {
@@ -65,12 +71,14 @@ fn main() {
         }))
         .init_resource::<ObjectPool<Enemy>>()
         .init_resource::<ObjectPool<Bullet>>()
+        .insert_resource(RespawnCounter { count: 0 })
         .add_systems(Startup, (setup_scene, spawn_player, spawn_enemies))
         .add_systems(Update, (
             handle_input,
             move_player,
             follow_camera,
             enemy_ai,
+            enemy_collision,
             update_bullets,
             update_area_effects,
             bullet_enemy_collision,
@@ -270,6 +278,17 @@ fn follow_camera(
     }
 }
 
+fn random_respawn_position(counter: &mut RespawnCounter) -> Vec3 {
+    counter.count += 1;
+    let angle = (counter.count as f32 * 2.3) % TAU; // Use prime-like multiplier for spread
+    let distance = 5.0 + (counter.count % 4) as f32 * 1.5; // Vary distance 5-10.5 units
+    Vec3::new(
+        angle.cos() * distance,
+        1.0,
+        angle.sin() * distance,
+    )
+}
+
 fn spawn_enemies(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -366,7 +385,7 @@ fn bullet_enemy_collision(
     mut enemy_query: Query<(Entity, &Transform, &mut Enemy), (With<Enemy>, Without<Bullet>)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    time: Res<Time>,
+    mut respawn_counter: ResMut<RespawnCounter>,
 ) {
     for (bullet_entity, bullet_transform, bullet) in bullet_query.iter() {
         for (enemy_entity, enemy_transform, mut enemy) in enemy_query.iter_mut() {
@@ -383,12 +402,8 @@ fn bullet_enemy_collision(
                 if enemy.health <= 0 {
                     commands.entity(enemy_entity).despawn();
                     
-                    // Respawn enemy
-                    let respawn_pos = Vec3::new(
-                        (time.elapsed_seconds().sin() * 8.0) as f32,
-                        1.0,
-                        (time.elapsed_seconds().cos() * 8.0) as f32,
-                    );
+                    // Respawn enemy at random position
+                    let respawn_pos = random_respawn_position(&mut respawn_counter);
                     
                     commands.spawn((
                         PbrBundle {
@@ -419,6 +434,7 @@ fn area_effect_damage(
     mut enemy_query: Query<(Entity, &Transform, &mut Enemy), (With<Enemy>, Without<AreaEffect>)>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut respawn_counter: ResMut<RespawnCounter>,
     time: Res<Time>,
 ) {
     for (effect_transform, effect) in effect_query.iter() {
@@ -437,12 +453,8 @@ fn area_effect_damage(
                     if enemy.health <= 0 {
                         commands.entity(enemy_entity).despawn();
                         
-                        // Respawn enemy
-                        let respawn_pos = Vec3::new(
-                            (time.elapsed_seconds().sin() * 8.0) as f32,
-                            1.0,
-                            (time.elapsed_seconds().cos() * 8.0) as f32,
-                        );
+                        // Respawn enemy at random position
+                        let respawn_pos = random_respawn_position(&mut respawn_counter);
                         
                         commands.spawn((
                             PbrBundle {
@@ -463,6 +475,29 @@ fn area_effect_damage(
                     }
                 }
             }
+        }
+    }
+}
+
+fn enemy_collision(
+    mut enemy_query: Query<(Entity, &mut Transform), With<Enemy>>,
+) {
+    let mut combinations = enemy_query.iter_combinations_mut();
+    while let Some([(_entity_a, mut transform_a), (_entity_b, mut transform_b)]) = combinations.fetch_next() {
+        let distance = transform_a.translation.distance(transform_b.translation);
+        let min_distance = 1.2; // Minimum distance between enemies
+        
+        if distance < min_distance {
+            let pushback_force = (min_distance - distance) * 0.5;
+            let direction = (transform_a.translation - transform_b.translation).normalize_or_zero();
+            
+            // Push enemies apart
+            transform_a.translation += direction * pushback_force * 0.5;
+            transform_b.translation -= direction * pushback_force * 0.5;
+            
+            // Keep enemies on ground
+            transform_a.translation.y = 1.0;
+            transform_b.translation.y = 1.0;
         }
     }
 }
