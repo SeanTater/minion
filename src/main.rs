@@ -21,6 +21,7 @@ struct Enemy {
     speed: f32,
     health: i32,
     chase_distance: f32,
+    is_dying: bool,
 }
 
 #[derive(Component)]
@@ -317,6 +318,7 @@ fn spawn_enemies(
                 speed: 3.0,
                 health: 3,
                 chase_distance: 8.0,
+                is_dying: false,
             },
         ));
     }
@@ -329,6 +331,10 @@ fn enemy_ai(
 ) {
     if let Ok(player_transform) = player_query.get_single() {
         for (mut enemy_transform, enemy) in enemy_query.iter_mut() {
+            if enemy.is_dying {
+                continue; // Skip dying enemies
+            }
+            
             let distance = enemy_transform.translation.distance(player_transform.translation);
             
             if distance <= enemy.chase_distance && distance > 1.0 {
@@ -399,7 +405,8 @@ fn bullet_enemy_collision(
                 commands.entity(bullet_entity).despawn();
                 
                 // Kill enemy if health depleted
-                if enemy.health <= 0 {
+                if enemy.health <= 0 && !enemy.is_dying {
+                    enemy.is_dying = true;
                     commands.entity(enemy_entity).despawn();
                     
                     // Respawn enemy at random position
@@ -419,6 +426,7 @@ fn bullet_enemy_collision(
                             speed: 3.0,
                             health: 3,
                             chase_distance: 8.0,
+                            is_dying: false,
                         },
                     ));
                 }
@@ -446,11 +454,12 @@ fn area_effect_damage(
                 let damage_multiplier = (1.0 - (distance / effect.radius)).max(0.0);
                 let damage = (effect.damage_per_second as f32 * damage_multiplier * time.delta_seconds()) as i32;
                 
-                if damage > 0 {
+                if damage > 0 && !enemy.is_dying {
                     enemy.health -= damage.max(1);
                     
                     // Kill enemy if health depleted
-                    if enemy.health <= 0 {
+                    if enemy.health <= 0 && !enemy.is_dying {
+                        enemy.is_dying = true;
                         commands.entity(enemy_entity).despawn();
                         
                         // Respawn enemy at random position
@@ -470,6 +479,7 @@ fn area_effect_damage(
                                 speed: 3.0,
                                 health: 3,
                                 chase_distance: 8.0,
+                                is_dying: false,
                             },
                         ));
                     }
@@ -480,10 +490,14 @@ fn area_effect_damage(
 }
 
 fn enemy_collision(
-    mut enemy_query: Query<(Entity, &mut Transform), With<Enemy>>,
+    mut enemy_query: Query<(Entity, &mut Transform, &Enemy), With<Enemy>>,
 ) {
     let mut combinations = enemy_query.iter_combinations_mut();
-    while let Some([(_entity_a, mut transform_a), (_entity_b, mut transform_b)]) = combinations.fetch_next() {
+    while let Some([(_entity_a, mut transform_a, enemy_a), (_entity_b, mut transform_b, enemy_b)]) = combinations.fetch_next() {
+        if enemy_a.is_dying || enemy_b.is_dying {
+            continue; // Skip dying enemies
+        }
+        
         let distance = transform_a.translation.distance(transform_b.translation);
         let min_distance = 1.2; // Minimum distance between enemies
         
