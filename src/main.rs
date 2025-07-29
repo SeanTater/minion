@@ -225,7 +225,7 @@ fn handle_input(
                 },
                 AreaEffect {
                     radius: 3.0,
-                    damage_per_second: 5,
+                    damage_per_second: 100,
                     duration: 2.0,
                     elapsed: 0.0,
                 },
