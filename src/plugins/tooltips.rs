@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::components::{Enemy, Name as EnemyName};
+use crate::components::{Enemy, Name as EnemyName, ResourceType, ResourceDisplay};
 use crate::resources::GameState;
 
 pub struct TooltipPlugin;
@@ -20,20 +20,7 @@ pub struct EnemyTooltip {
     pub enemy_entity: Entity,
 }
 
-#[derive(Component)]
-pub struct TooltipHealthBar {
-    pub enemy_entity: Entity,
-}
-
-#[derive(Component)]
-pub struct TooltipManaBar {
-    pub enemy_entity: Entity,
-}
-
-#[derive(Component)]
-pub struct TooltipEnergyBar {
-    pub enemy_entity: Entity,
-}
+// Old tooltip resource bar components removed - now using unified ResourceDisplay
 
 #[derive(Component)]
 pub struct TooltipNameText;
@@ -78,92 +65,10 @@ fn update_enemy_tooltips(
                     TooltipNameText,
                 ));
                 
-                // Health bar container
-                parent.spawn(Node {
-                    width: Val::Px(100.0),
-                    height: Val::Px(6.0),
-                    margin: UiRect::vertical(Val::Px(1.0)),
-                    ..default()
-                }).with_children(|health_container| {
-                    // Health bar background
-                    health_container.spawn((
-                        Node {
-                            width: Val::Percent(100.0),
-                            height: Val::Percent(100.0),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
-                    ));
-                    
-                    // Health bar fill
-                    health_container.spawn((
-                        Node {
-                            width: Val::Percent(100.0),
-                            height: Val::Percent(100.0),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgb(0.8, 0.2, 0.2)),
-                        TooltipHealthBar { enemy_entity },
-                    ));
-                });
-
-                // Mana bar container
-                parent.spawn(Node {
-                    width: Val::Px(100.0),
-                    height: Val::Px(6.0),
-                    margin: UiRect::vertical(Val::Px(1.0)),
-                    ..default()
-                }).with_children(|mana_container| {
-                    // Mana bar background
-                    mana_container.spawn((
-                        Node {
-                            width: Val::Percent(100.0),
-                            height: Val::Percent(100.0),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
-                    ));
-                    
-                    // Mana bar fill
-                    mana_container.spawn((
-                        Node {
-                            width: Val::Percent(100.0),
-                            height: Val::Percent(100.0),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgb(0.2, 0.2, 0.8)),
-                        TooltipManaBar { enemy_entity },
-                    ));
-                });
-
-                // Energy bar container
-                parent.spawn(Node {
-                    width: Val::Px(100.0),
-                    height: Val::Px(6.0),
-                    margin: UiRect::vertical(Val::Px(1.0)),
-                    ..default()
-                }).with_children(|energy_container| {
-                    // Energy bar background
-                    energy_container.spawn((
-                        Node {
-                            width: Val::Percent(100.0),
-                            height: Val::Percent(100.0),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
-                    ));
-                    
-                    // Energy bar fill
-                    energy_container.spawn((
-                        Node {
-                            width: Val::Percent(100.0),
-                            height: Val::Percent(100.0),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgb(0.8, 0.8, 0.2)),
-                        TooltipEnergyBar { enemy_entity },
-                    ));
-                });
+                // Create consolidated resource bars for tooltip
+                for resource_type in [ResourceType::Health, ResourceType::Mana, ResourceType::Energy] {
+                    spawn_tooltip_resource_bar(parent, resource_type, enemy_entity);
+                }
             });
         }
     }
@@ -206,33 +111,57 @@ fn position_tooltips(
     }
 }
 
+fn spawn_tooltip_resource_bar(
+    parent: &mut bevy::prelude::ChildSpawnerCommands,
+    resource_type: ResourceType,
+    enemy_entity: Entity,
+) {
+    parent.spawn((
+        Node {
+            width: Val::Px(100.0),
+            height: Val::Px(6.0),
+            margin: UiRect::vertical(Val::Px(1.0)),
+            ..default()
+        },
+        BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
+        ResourceDisplay::new(resource_type, enemy_entity, false), // No text for tooltips
+    )).with_children(|bar_container| {
+        // Resource bar fill
+        bar_container.spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                ..default()
+            },
+            BackgroundColor(resource_type.color()),
+        ));
+    });
+}
+
 fn update_tooltip_resources(
     enemy_query: Query<&Enemy>,
-    mut health_bar_query: Query<(&mut Node, &TooltipHealthBar), (With<TooltipHealthBar>, Without<TooltipManaBar>, Without<TooltipEnergyBar>)>,
-    mut mana_bar_query: Query<(&mut Node, &TooltipManaBar), (With<TooltipManaBar>, Without<TooltipHealthBar>, Without<TooltipEnergyBar>)>,
-    mut energy_bar_query: Query<(&mut Node, &TooltipEnergyBar), (With<TooltipEnergyBar>, Without<TooltipHealthBar>, Without<TooltipManaBar>)>,
+    resource_displays: Query<(Entity, &ResourceDisplay), With<ResourceDisplay>>,
+    mut bar_fills: Query<&mut Node, (Without<ResourceDisplay>, Without<Text>)>,
+    children_query: Query<&Children>,
 ) {
-    // Update health bars
-    for (mut node, health_bar) in health_bar_query.iter_mut() {
-        if let Ok(enemy) = enemy_query.get(health_bar.enemy_entity) {
-            let health_percent = enemy.health.percentage();
-            node.width = Val::Percent(health_percent * 100.0);
-        }
-    }
-    
-    // Update mana bars
-    for (mut node, mana_bar) in mana_bar_query.iter_mut() {
-        if let Ok(enemy) = enemy_query.get(mana_bar.enemy_entity) {
-            let mana_percent = enemy.mana.percentage();
-            node.width = Val::Percent(mana_percent * 100.0);
-        }
-    }
-    
-    // Update energy bars
-    for (mut node, energy_bar) in energy_bar_query.iter_mut() {
-        if let Ok(enemy) = enemy_query.get(energy_bar.enemy_entity) {
-            let energy_percent = enemy.energy.percentage();
-            node.width = Val::Percent(energy_percent * 100.0);
+    // Update each resource display
+    for (display_entity, display) in resource_displays.iter() {
+        if let Ok(enemy) = enemy_query.get(display.target_entity) {
+            let (current, max) = match display.resource_type {
+                ResourceType::Health => (enemy.health.current, enemy.health.max),
+                ResourceType::Mana => (enemy.mana.current, enemy.mana.max),
+                ResourceType::Energy => (enemy.energy.current, enemy.energy.max),
+            };
+            
+            // Update the bar fill child of this resource display
+            if let Ok(children) = children_query.get(display_entity) {
+                for child_entity in children.iter() {
+                    if let Ok(mut bar_node) = bar_fills.get_mut(child_entity) {
+                        let percentage = if max > 0.0 { current / max } else { 0.0 };
+                        bar_node.width = Val::Percent(percentage * 100.0);
+                    }
+                }
+            }
         }
     }
 }

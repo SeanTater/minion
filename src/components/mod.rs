@@ -109,6 +109,8 @@ impl<T> std::fmt::Display for ResourcePool<T> {
     }
 }
 
+// Trait removed - using direct field access instead
+
 impl Speed {
     pub fn new(value: f32) -> Self { Self(value.max(0.0)) }
     pub const ZERO: Speed = Speed(0.0);
@@ -188,6 +190,49 @@ pub struct Enemy {
 
 #[derive(Component)]
 pub struct Name(pub String);
+
+// Unified resource display system
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ResourceType {
+    Health,
+    Mana, 
+    Energy,
+}
+
+impl ResourceType {
+    pub fn color(self) -> Color {
+        match self {
+            ResourceType::Health => Color::srgb(0.8, 0.2, 0.2),
+            ResourceType::Mana => Color::srgb(0.2, 0.2, 0.8),
+            ResourceType::Energy => Color::srgb(0.8, 0.8, 0.2),
+        }
+    }
+    
+    pub fn label(self) -> &'static str {
+        match self {
+            ResourceType::Health => "HP",
+            ResourceType::Mana => "MP", 
+            ResourceType::Energy => "EN",
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct ResourceDisplay {
+    pub resource_type: ResourceType,
+    pub target_entity: Entity,
+    pub show_text: bool,
+}
+
+impl ResourceDisplay {
+    pub fn new(resource_type: ResourceType, target_entity: Entity, show_text: bool) -> Self {
+        Self {
+            resource_type,
+            target_entity,
+            show_text,
+        }
+    }
+}
 
 #[derive(Component)]
 pub struct Bullet {

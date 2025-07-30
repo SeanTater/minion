@@ -1,4 +1,4 @@
-use crate::components::*;
+use crate::components::{*, ResourceType, ResourceDisplay};
 use crate::config::{load_config_or_default, save_config};
 use crate::resources::*;
 use bevy::app::AppExit;
@@ -49,23 +49,7 @@ pub struct StartButton;
 #[derive(Component)]
 pub struct ScoreText;
 
-#[derive(Component)]
-pub struct HealthBar;
-
-#[derive(Component)]
-pub struct HealthText;
-
-#[derive(Component)]
-pub struct ManaBar;
-
-#[derive(Component)]
-pub struct ManaText;
-
-#[derive(Component)]
-pub struct EnergyBar;
-
-#[derive(Component)]
-pub struct EnergyText;
+// Old resource bar components removed - now using unified ResourceDisplay
 
 fn load_game_config(mut commands: Commands, mut username_input: ResMut<UsernameInput>) {
     let config = load_config_or_default();
@@ -260,145 +244,13 @@ fn setup_game_ui_simple(mut commands: Commands) {
                     ..default()
                 })
                 .with_children(|hud| {
-                    // Health bar container
-                    hud.spawn(Node {
-                        width: Val::Px(200.0),
-                        height: Val::Px(25.0),
-                        margin: UiRect::right(Val::Px(15.0)),
-                        ..default()
-                    })
-                    .with_children(|health_container| {
-                        // Health bar background
-                        health_container.spawn((
-                            Node {
-                                width: Val::Percent(100.0),
-                                height: Val::Percent(100.0),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
-                        ));
-
-                        // Health bar fill
-                        health_container.spawn((
-                            Node {
-                                width: Val::Percent(100.0), // Will be updated dynamically
-                                height: Val::Percent(100.0),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgb(0.8, 0.2, 0.2)),
-                            HealthBar,
-                        ));
-
-                        // Health text
-                        health_container.spawn((
-                            Text::new("HP: 100/100"),
-                            TextFont {
-                                font_size: 16.0,
-                                ..default()
-                            },
-                            TextColor(Color::WHITE),
-                            Node {
-                                position_type: PositionType::Absolute,
-                                left: Val::Px(5.0),
-                                top: Val::Px(2.0),
-                                ..default()
-                            },
-                            HealthText,
-                        ));
-                    });
-
-                    // Mana bar container
-                    hud.spawn(Node {
-                        width: Val::Px(200.0),
-                        height: Val::Px(25.0),
-                        margin: UiRect::right(Val::Px(15.0)),
-                        ..default()
-                    })
-                    .with_children(|mana_container| {
-                        // Mana bar background
-                        mana_container.spawn((
-                            Node {
-                                width: Val::Percent(100.0),
-                                height: Val::Percent(100.0),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
-                        ));
-
-                        // Mana bar fill
-                        mana_container.spawn((
-                            Node {
-                                width: Val::Percent(100.0), // Will be updated dynamically
-                                height: Val::Percent(100.0),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgb(0.2, 0.2, 0.8)),
-                            ManaBar,
-                        ));
-
-                        // Mana text
-                        mana_container.spawn((
-                            Text::new("MP: 50/50"),
-                            TextFont {
-                                font_size: 16.0,
-                                ..default()
-                            },
-                            TextColor(Color::WHITE),
-                            Node {
-                                position_type: PositionType::Absolute,
-                                left: Val::Px(5.0),
-                                top: Val::Px(2.0),
-                                ..default()
-                            },
-                            ManaText,
-                        ));
-                    });
-
-                    // Energy bar container
-                    hud.spawn(Node {
-                        width: Val::Px(200.0),
-                        height: Val::Px(25.0),
-                        ..default()
-                    })
-                    .with_children(|energy_container| {
-                        // Energy bar background
-                        energy_container.spawn((
-                            Node {
-                                width: Val::Percent(100.0),
-                                height: Val::Percent(100.0),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
-                        ));
-
-                        // Energy bar fill
-                        energy_container.spawn((
-                            Node {
-                                width: Val::Percent(100.0), // Will be updated dynamically
-                                height: Val::Percent(100.0),
-                                ..default()
-                            },
-                            BackgroundColor(Color::srgb(0.8, 0.8, 0.2)),
-                            EnergyBar,
-                        ));
-
-                        // Energy text
-                        energy_container.spawn((
-                            Text::new("EN: 100/100"),
-                            TextFont {
-                                font_size: 16.0,
-                                ..default()
-                            },
-                            TextColor(Color::WHITE),
-                            Node {
-                                position_type: PositionType::Absolute,
-                                left: Val::Px(5.0),
-                                top: Val::Px(2.0),
-                                ..default()
-                            },
-                            EnergyText,
-                        ));
-                    });
+                    // Get player entity for resource displays (we'll find it in the update system)
+                    let temp_entity = Entity::PLACEHOLDER; // Will be updated in the system
+                    
+                    // Create consolidated resource bars
+                    for (i, resource_type) in [ResourceType::Health, ResourceType::Mana, ResourceType::Energy].iter().enumerate() {
+                        spawn_resource_bar(hud, *resource_type, temp_entity, i < 2); // Add margin to first two
+                    }
                 });
 
             // Controls text at bottom
@@ -419,56 +271,87 @@ fn setup_game_ui_simple(mut commands: Commands) {
         });
 }
 
-fn update_hud(
-    player_query: Query<&Player>,
-    mut health_bar_query: Query<&mut Node, (With<HealthBar>, Without<ManaBar>, Without<EnergyBar>)>,
-    mut mana_bar_query: Query<&mut Node, (With<ManaBar>, Without<HealthBar>, Without<EnergyBar>)>,
-    mut energy_bar_query: Query<&mut Node, (With<EnergyBar>, Without<HealthBar>, Without<ManaBar>)>,
-    mut health_text_query: Query<
-        &mut Text,
-        (With<HealthText>, Without<ManaText>, Without<EnergyText>),
-    >,
-    mut mana_text_query: Query<
-        &mut Text,
-        (With<ManaText>, Without<HealthText>, Without<EnergyText>),
-    >,
-    mut energy_text_query: Query<
-        &mut Text,
-        (With<EnergyText>, Without<HealthText>, Without<ManaText>),
-    >,
+fn spawn_resource_bar(
+    parent: &mut bevy::prelude::ChildSpawnerCommands,
+    resource_type: ResourceType,
+    target_entity: Entity,
+    add_margin: bool,
 ) {
-    if let Ok(player) = player_query.single() {
-        // Update health bar
-        if let Ok(mut health_bar) = health_bar_query.single_mut() {
-            let health_percent = player.health.percentage();
-            health_bar.width = Val::Percent(health_percent * 100.0);
-        }
+    parent.spawn((
+        Node {
+            width: Val::Px(200.0),
+            height: Val::Px(25.0),
+            margin: if add_margin { UiRect::right(Val::Px(15.0)) } else { UiRect::ZERO },
+            ..default()
+        },
+        BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
+        ResourceDisplay::new(resource_type, target_entity, true),
+    )).with_children(|bar_container| {
+        // Resource bar fill
+        bar_container.spawn((
+            Node {
+                width: Val::Percent(100.0), // Will be updated dynamically
+                height: Val::Percent(100.0),
+                ..default()
+            },
+            BackgroundColor(resource_type.color()),
+        ));
+        
+        // Resource text overlay
+        bar_container.spawn((
+            Text::new(format!("{}: 100/100", resource_type.label())),
+            TextFont {
+                font_size: 16.0,
+                ..default()
+            },
+            TextColor(Color::WHITE),
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(5.0),
+                top: Val::Px(2.0),
+                ..default()
+            },
+        ));
+    });
+}
 
-        // Update mana bar
-        if let Ok(mut mana_bar) = mana_bar_query.single_mut() {
-            let mana_percent = player.mana.percentage();
-            mana_bar.width = Val::Percent(mana_percent * 100.0);
-        }
-
-        // Update energy bar
-        if let Ok(mut energy_bar) = energy_bar_query.single_mut() {
-            let energy_percent = player.energy.percentage();
-            energy_bar.width = Val::Percent(energy_percent * 100.0);
-        }
-
-        // Update health text
-        if let Ok(mut health_text) = health_text_query.single_mut() {
-            **health_text = format!("HP: {}", player.health);
-        }
-
-        // Update mana text
-        if let Ok(mut mana_text) = mana_text_query.single_mut() {
-            **mana_text = format!("MP: {}", player.mana);
-        }
-
-        // Update energy text
-        if let Ok(mut energy_text) = energy_text_query.single_mut() {
-            **energy_text = format!("EN: {}", player.energy);
+fn update_hud(
+    player_query: Query<(Entity, &Player)>,
+    mut resource_displays: Query<(Entity, &mut ResourceDisplay), With<ResourceDisplay>>,
+    mut bar_fills: Query<&mut Node, (Without<ResourceDisplay>, Without<Text>)>,
+    mut texts: Query<&mut Text, Without<ResourceDisplay>>,
+    children_query: Query<&Children>,
+) {
+    if let Ok((player_entity, player)) = player_query.single() {
+        // Update resource displays to point to the correct player entity and update their children
+        for (display_entity, mut display) in resource_displays.iter_mut() {
+            if display.target_entity == Entity::PLACEHOLDER {
+                display.target_entity = player_entity;
+            }
+            
+            if display.target_entity == player_entity {
+                let (current, max) = match display.resource_type {
+                    ResourceType::Health => (player.health.current, player.health.max),
+                    ResourceType::Mana => (player.mana.current, player.mana.max),
+                    ResourceType::Energy => (player.energy.current, player.energy.max),
+                };
+                
+                // Update the bar fill and text children of this resource display
+                if let Ok(children) = children_query.get(display_entity) {
+                    for child_entity in children.iter() {
+                        // Update bar fill (first child)
+                        if let Ok(mut bar_node) = bar_fills.get_mut(child_entity) {
+                            let percentage = if max > 0.0 { current / max } else { 0.0 };
+                            bar_node.width = Val::Percent(percentage * 100.0);
+                        }
+                        
+                        // Update text (second child)
+                        if let Ok(mut text) = texts.get_mut(child_entity) {
+                            **text = format!("{}: {:.0}/{:.0}", display.resource_type.label(), current, max);
+                        }
+                    }
+                }
+            }
         }
     }
 }
