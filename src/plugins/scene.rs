@@ -19,44 +19,39 @@ fn setup_scene(
 ) {
     // Ground plane
     commands.spawn((
-        PbrBundle {
-            mesh: meshes.add(Plane3d::default().mesh().size(20.0, 20.0)),
-            material: materials.add(StandardMaterial {
-                base_color: Color::srgb(0.3, 0.5, 0.3),
-                ..default()
-            }),
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(20.0, 20.0))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.3, 0.5, 0.3),
             ..default()
-        },
+        })),
         Ground,
     ));
 
     // Light
-    commands.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight {
+    commands.spawn((
+        DirectionalLight {
             shadows_enabled: true,
             ..default()
         },
-        transform: Transform {
+        Transform {
             translation: Vec3::new(0.0, 2.0, 0.0),
             rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_4),
             ..default()
         },
-        ..default()
-    });
+    ));
 
     // Ambient light
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
         brightness: 300.0,
+        affects_lightmapped_meshes: false,
     });
 
     // Camera with isometric view that follows player
     commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_xyz(10.0, 15.0, 10.0)
-                .looking_at(Vec3::ZERO, Vec3::Y),
-            ..default()
-        },
+        Camera3d::default(),
+        Transform::from_xyz(10.0, 15.0, 10.0)
+            .looking_at(Vec3::ZERO, Vec3::Y),
         CameraFollow {
             offset: Vec3::new(10.0, 15.0, 10.0),
         },
@@ -67,7 +62,7 @@ fn follow_camera(
     player_query: Query<&Transform, (With<Player>, Without<CameraFollow>)>,
     mut camera_query: Query<(&mut Transform, &CameraFollow), Without<Player>>,
 ) {
-    if let Ok(player_transform) = player_query.get_single() {
+    if let Ok(player_transform) = player_query.single() {
         for (mut camera_transform, follow) in camera_query.iter_mut() {
             let target_pos = player_transform.translation + follow.offset;
             camera_transform.translation = target_pos;

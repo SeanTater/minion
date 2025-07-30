@@ -4,6 +4,10 @@ use bevy::prelude::*;
 pub struct Player {
     pub move_target: Option<Vec3>,
     pub speed: f32,
+    pub health: i32,
+    pub max_health: i32,
+    pub mana: i32,
+    pub max_mana: i32,
 }
 
 #[derive(Component)]
@@ -21,6 +25,9 @@ pub struct Enemy {
     pub chase_distance: f32,
     pub is_dying: bool,
 }
+
+#[derive(Component)]
+pub struct Name(pub String);
 
 #[derive(Component)]
 pub struct Bullet {
