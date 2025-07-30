@@ -61,3 +61,6 @@ The single-file architecture is ready for modularization. Natural split points:
 - Input handling → `input.rs`
 - Object pooling expansion for bullets/effects
 - Game state management for menus/levels
+
+## Interaction Guidelines
+- Don't run the game yourself (e.g. with `cargo run`) - graphics don't work in your terminal. Instead, ask the user to run it

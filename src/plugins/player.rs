@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy::prelude::Camera3d;
 use crate::components::*;
-use crate::resources::GameState;
+use crate::resources::{GameState, GameConfig};
 
 pub struct PlayerPlugin;
 
@@ -10,7 +10,8 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app
             .add_systems(OnEnter(GameState::Playing), spawn_player)
-            .add_systems(Update, (handle_player_input, move_player).run_if(in_state(GameState::Playing)));
+            .add_systems(Update, (handle_player_input, move_player).run_if(in_state(GameState::Playing)))
+            .add_systems(OnExit(GameState::Playing), cleanup_player);
     }
 }
 
@@ -18,9 +19,13 @@ fn spawn_player(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    game_config: Res<GameConfig>,
+    player_query: Query<&Player>,
 ) {
-    // Player character (simple capsule)
-    commands.spawn((
+    // Only spawn player if none exists
+    if player_query.is_empty() {
+        // Player character (simple capsule)
+        commands.spawn((
         Mesh3d(meshes.add(Capsule3d::new(0.5, 2.0))),
         MeshMaterial3d(materials.add(StandardMaterial {
             base_color: Color::srgb(0.8, 0.2, 0.2),
@@ -29,11 +34,13 @@ fn spawn_player(
         Transform::from_xyz(0.0, 1.0, 0.0),
         Player {
             move_target: None,
-            speed: Speed::new(5.0),
-            health: HealthPool::new_full(100.0),
-            mana: ManaPool::new_full(50.0),
+            speed: Speed::new(game_config.settings.player_movement_speed),
+            health: HealthPool::new_full(game_config.settings.player_max_health),
+            mana: ManaPool::new_full(game_config.settings.player_max_mana),
+            energy: EnergyPool::new_full(game_config.settings.player_max_energy),
         },
-    ));
+        ));
+    }
 }
 
 fn handle_player_input(
@@ -82,5 +89,14 @@ fn move_player(
                 player.move_target = None;
             }
         }
+    }
+}
+
+fn cleanup_player(
+    mut commands: Commands,
+    player_query: Query<Entity, With<Player>>,
+) {
+    for entity in player_query.iter() {
+        commands.entity(entity).despawn();
     }
 }

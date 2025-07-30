@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::components::{Enemy, Name as EnemyName};
+use crate::components::{Enemy, Name as EnemyName, ResourceType, ResourceDisplay};
 use crate::resources::GameState;
 
 pub struct TooltipPlugin;
@@ -9,9 +9,10 @@ impl Plugin for TooltipPlugin {
         app.add_systems(Update, (
             update_enemy_tooltips,
             position_tooltips,
-            update_tooltip_health,
+            update_tooltip_resources,
             cleanup_dead_enemy_tooltips,
-        ).run_if(in_state(GameState::Playing)));
+        ).run_if(in_state(GameState::Playing)))
+        .add_systems(OnExit(GameState::Playing), cleanup_all_tooltips);
     }
 }
 
@@ -20,14 +21,10 @@ pub struct EnemyTooltip {
     pub enemy_entity: Entity,
 }
 
-#[derive(Component)]
-pub struct TooltipHealthBar;
+// Old tooltip resource bar components removed - now using unified ResourceDisplay
 
 #[derive(Component)]
 pub struct TooltipNameText;
-
-#[derive(Component)]
-pub struct TooltipHealthText;
 
 fn update_enemy_tooltips(
     mut commands: Commands,
@@ -47,7 +44,7 @@ fn update_enemy_tooltips(
                 Node {
                     position_type: PositionType::Absolute,
                     width: Val::Px(120.0),
-                    height: Val::Px(40.0),
+                    height: Val::Px(70.0),
                     justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
                     flex_direction: FlexDirection::Column,
@@ -60,39 +57,19 @@ fn update_enemy_tooltips(
                 // Enemy name
                 parent.spawn((
                     Text::new(name.0.clone()),
-                    TextFont { font_size: 12.0, ..default() },
+                    TextFont { font_size: 11.0, ..default() },
                     TextColor(Color::WHITE),
+                    Node {
+                        margin: UiRect::bottom(Val::Px(2.0)),
+                        ..default()
+                    },
                     TooltipNameText,
                 ));
                 
-                // Health bar container
-                parent.spawn(Node {
-                    width: Val::Px(100.0),
-                    height: Val::Px(8.0),
-                    margin: UiRect::top(Val::Px(2.0)),
-                    ..default()
-                }).with_children(|health_container| {
-                    // Health bar background
-                    health_container.spawn((
-                        Node {
-                            width: Val::Percent(100.0),
-                            height: Val::Percent(100.0),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
-                    ));
-                    
-                    // Health bar fill
-                    health_container.spawn((
-                        Node {
-                            width: Val::Percent(100.0),
-                            height: Val::Percent(100.0),
-                            ..default()
-                        },
-                        BackgroundColor(Color::srgb(0.8, 0.2, 0.2)),
-                        TooltipHealthBar,
-                    ));
-                });
+                // Create consolidated resource bars for tooltip
+                for resource_type in [ResourceType::Health, ResourceType::Mana, ResourceType::Energy] {
+                    spawn_tooltip_resource_bar(parent, resource_type, enemy_entity);
+                }
             });
         }
     }
@@ -123,7 +100,7 @@ fn position_tooltips(
             if let Ok(screen_pos) = camera.world_to_viewport(camera_transform, world_pos) {
                 // Position tooltip at screen coordinates
                 tooltip_node.left = Val::Px(screen_pos.x - 60.0); // Center horizontally
-                tooltip_node.top = Val::Px(screen_pos.y - 40.0); // Position above enemy
+                tooltip_node.top = Val::Px(screen_pos.y - 70.0); // Position above enemy
             } else {
                 // Hide tooltip if enemy is off-screen
                 tooltip_node.display = Display::None;
@@ -135,18 +112,55 @@ fn position_tooltips(
     }
 }
 
-fn update_tooltip_health(
-    mut tooltip_health_query: Query<&mut Node, With<TooltipHealthBar>>,
-    tooltip_query: Query<(&EnemyTooltip, &Children)>,
-    enemy_query: Query<&Enemy>,
+fn spawn_tooltip_resource_bar(
+    parent: &mut bevy::prelude::ChildSpawnerCommands,
+    resource_type: ResourceType,
+    enemy_entity: Entity,
 ) {
-    for (enemy_tooltip, children) in tooltip_query.iter() {
-        if let Ok(enemy) = enemy_query.get(enemy_tooltip.enemy_entity) {
-            // Find the health bar among the children
-            for child in children.iter() {
-                if let Ok(mut health_bar) = tooltip_health_query.get_mut(child) {
-                    let health_percent = enemy.health.percentage();
-                    health_bar.width = Val::Percent(health_percent * 100.0);
+    parent.spawn((
+        Node {
+            width: Val::Px(100.0),
+            height: Val::Px(6.0),
+            margin: UiRect::vertical(Val::Px(1.0)),
+            ..default()
+        },
+        BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
+        ResourceDisplay::new(resource_type, enemy_entity, false), // No text for tooltips
+    )).with_children(|bar_container| {
+        // Resource bar fill
+        bar_container.spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                ..default()
+            },
+            BackgroundColor(resource_type.color()),
+        ));
+    });
+}
+
+fn update_tooltip_resources(
+    enemy_query: Query<&Enemy>,
+    resource_displays: Query<(Entity, &ResourceDisplay), With<ResourceDisplay>>,
+    mut bar_fills: Query<&mut Node, (Without<ResourceDisplay>, Without<Text>)>,
+    children_query: Query<&Children>,
+) {
+    // Update each resource display
+    for (display_entity, display) in resource_displays.iter() {
+        if let Ok(enemy) = enemy_query.get(display.target_entity) {
+            let (current, max) = match display.resource_type {
+                ResourceType::Health => (enemy.health.current, enemy.health.max),
+                ResourceType::Mana => (enemy.mana.current, enemy.mana.max),
+                ResourceType::Energy => (enemy.energy.current, enemy.energy.max),
+            };
+            
+            // Update the bar fill child of this resource display
+            if let Ok(children) = children_query.get(display_entity) {
+                for child_entity in children.iter() {
+                    if let Ok(mut bar_node) = bar_fills.get_mut(child_entity) {
+                        let percentage = if max > 0.0 { current / max } else { 0.0 };
+                        bar_node.width = Val::Percent(percentage * 100.0);
+                    }
                 }
             }
         }
@@ -168,5 +182,15 @@ fn cleanup_dead_enemy_tooltips(
             // Enemy entity doesn't exist anymore
             commands.entity(tooltip_entity).despawn();
         }
+    }
+}
+
+fn cleanup_all_tooltips(
+    mut commands: Commands,
+    tooltip_query: Query<Entity, With<EnemyTooltip>>,
+) {
+    // Remove all tooltips when exiting the Playing state
+    for tooltip_entity in tooltip_query.iter() {
+        commands.entity(tooltip_entity).despawn();
     }
 }

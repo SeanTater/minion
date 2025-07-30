@@ -12,7 +12,8 @@ fn main() {
             ..default()
         }))
         .add_plugins((
-            UiPlugin,
+            EguiUiPlugin,
+            UiPlugin, // Re-enabled for camera setup
             ScenePlugin,
             PlayerPlugin,
             EnemyPlugin,

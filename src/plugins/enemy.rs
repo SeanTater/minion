@@ -5,11 +5,10 @@ pub struct EnemyPlugin;
 
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<EnemyConfig>()
-            .init_resource::<ObjectPool<Enemy>>()
-            .insert_resource(RespawnCounter { count: 0 })
+        app.insert_resource(RespawnCounter { count: 0 })
             .add_systems(OnEnter(GameState::Playing), spawn_enemies)
-            .add_systems(Update, (enemy_ai, enemy_collision).run_if(in_state(GameState::Playing)));
+            .add_systems(Update, (enemy_ai, enemy_collision).run_if(in_state(GameState::Playing)))
+            .add_systems(OnExit(GameState::Playing), cleanup_enemies);
     }
 }
 
@@ -17,17 +16,20 @@ fn spawn_enemies(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    enemy_config: Res<EnemyConfig>,
+    game_config: Res<GameConfig>,
+    enemy_query: Query<&Enemy>,
 ) {
-    let spawn_positions = [
-        Vec3::new(5.0, 1.0, 5.0),
-        Vec3::new(-5.0, 1.0, 5.0),
-        Vec3::new(5.0, 1.0, -5.0),
-        Vec3::new(-5.0, 1.0, -5.0),
-        Vec3::new(0.0, 1.0, 8.0),
-    ];
+    // Only spawn enemies if none exist
+    if enemy_query.is_empty() {
+        let spawn_positions = [
+            Vec3::new(5.0, 1.0, 5.0),
+            Vec3::new(-5.0, 1.0, 5.0),
+            Vec3::new(5.0, 1.0, -5.0),
+            Vec3::new(-5.0, 1.0, -5.0),
+            Vec3::new(0.0, 1.0, 8.0),
+        ];
 
-    for pos in spawn_positions {
+        for pos in spawn_positions {
         commands.spawn((
             Mesh3d(meshes.add(Sphere::new(0.5))),
             MeshMaterial3d(materials.add(StandardMaterial {
@@ -36,13 +38,16 @@ fn spawn_enemies(
             })),
             Transform::from_translation(pos),
             Enemy {
-                speed: enemy_config.speed,
-                health: HealthPool::new_full(enemy_config.max_health),
-                chase_distance: enemy_config.chase_distance,
+                speed: Speed::new(game_config.settings.enemy_movement_speed),
+                health: HealthPool::new_full(game_config.settings.enemy_max_health),
+                mana: ManaPool::new_full(game_config.settings.enemy_max_mana),
+                energy: EnergyPool::new_full(game_config.settings.enemy_max_energy),
+                chase_distance: Distance::new(game_config.settings.enemy_chase_distance),
                 is_dying: false,
             },
             Name(generate_dark_name()),
         ));
+        }
     }
 }
 
@@ -73,7 +78,7 @@ fn enemy_ai(
 
 fn enemy_collision(
     mut enemy_query: Query<(Entity, &mut Transform, &Enemy), With<Enemy>>,
-    enemy_config: Res<EnemyConfig>,
+    game_config: Res<GameConfig>,
 ) {
     let mut combinations = enemy_query.iter_combinations_mut();
     while let Some(
@@ -90,7 +95,7 @@ fn enemy_collision(
         if let Some((push_a, push_b)) = calculate_pushback(
             transform_a.translation,
             transform_b.translation,
-            enemy_config.collision_distance,
+            Distance::new(game_config.settings.enemy_collision_distance),
         ) {
             transform_a.translation += push_a;
             transform_b.translation += push_b;
@@ -99,5 +104,14 @@ fn enemy_collision(
             transform_a.translation.y = 1.0;
             transform_b.translation.y = 1.0;
         }
+    }
+}
+
+fn cleanup_enemies(
+    mut commands: Commands,
+    enemy_query: Query<Entity, With<Enemy>>,
+) {
+    for entity in enemy_query.iter() {
+        commands.entity(entity).despawn();
     }
 }
