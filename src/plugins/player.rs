@@ -29,11 +29,9 @@ fn spawn_player(
         Transform::from_xyz(0.0, 1.0, 0.0),
         Player {
             move_target: None,
-            speed: 5.0,
-            health: 100,
-            max_health: 100,
-            mana: 50,
-            max_mana: 50,
+            speed: Speed::new(5.0),
+            health: HealthPool::new_full(100.0),
+            mana: ManaPool::new_full(50.0),
         },
     ));
 }

@@ -1,27 +1,47 @@
 use bevy::prelude::*;
+use crate::components::Distance;
+use crate::game_logic::errors::{MinionError, MinionResult};
 use std::f32::consts::TAU;
 
 /// Generate a random spawn position in a ring around the origin
 /// Uses a counter for deterministic positioning that spreads enemies around
-pub fn generate_respawn_position(counter: u32, min_distance: f32, max_distance: f32) -> Vec3 {
-    let angle = (counter as f32 * 2.3) % TAU; // Use prime-like multiplier for spread
-    let distance = min_distance + (counter % 4) as f32 * (max_distance - min_distance) / 4.0;
+pub fn generate_respawn_position(counter: u32, min_distance: Distance, max_distance: Distance) -> MinionResult<Vec3> {
+    if min_distance.0 >= max_distance.0 {
+        return Err(MinionError::InvalidSpawnPosition { 
+            position: Vec3::ZERO 
+        });
+    }
     
-    Vec3::new(
+    let angle = (counter as f32 * 2.3) % TAU; // Use prime-like multiplier for spread
+    let distance = min_distance.0 + (counter % 4) as f32 * (max_distance.0 - min_distance.0) / 4.0;
+    
+    let position = Vec3::new(
         angle.cos() * distance,
         1.0, // Keep on ground level
         angle.sin() * distance,
-    )
+    );
+    
+    Ok(position)
+}
+
+/// Generate a random spawn position in a ring around the origin (fallback version)
+/// Uses a counter for deterministic positioning that spreads enemies around
+pub fn generate_respawn_position_unchecked(counter: u32, min_distance: Distance, max_distance: Distance) -> Vec3 {
+    generate_respawn_position(counter, min_distance, max_distance)
+        .unwrap_or_else(|err| {
+            eprintln!("Warning: Spawn position generation failed ({}), using fallback", err);
+            Vec3::new(5.0, 1.0, 0.0) // Safe fallback position
+        })
 }
 
 /// Check if a position is valid for spawning (not too close to other entities)
 pub fn is_valid_spawn_position(
     position: Vec3,
     existing_positions: &[Vec3],
-    min_distance: f32,
+    min_distance: Distance,
 ) -> bool {
     for &existing_pos in existing_positions {
-        if position.distance(existing_pos) < min_distance {
+        if position.distance(existing_pos) < min_distance.0 {
             return false;
         }
     }
@@ -34,8 +54,8 @@ mod tests {
 
     #[test]
     fn test_respawn_position_generation() {
-        let pos1 = generate_respawn_position(0, 5.0, 10.0);
-        let pos2 = generate_respawn_position(1, 5.0, 10.0);
+        let pos1 = generate_respawn_position(0, Distance::new(5.0), Distance::new(10.0)).unwrap();
+        let pos2 = generate_respawn_position(1, Distance::new(5.0), Distance::new(10.0)).unwrap();
         
         // Positions should be different
         assert_ne!(pos1, pos2);
@@ -60,17 +80,17 @@ mod tests {
             Vec3::new(10.0, 1.0, 0.0),
         ];
         
-        // Should be valid - far enough from existing positions
-        assert!(is_valid_spawn_position(position, &existing, 2.0));
+        // Should be valid - far enough from existing positions  
+        assert!(is_valid_spawn_position(position, &existing, Distance::new(2.0)));
         
         // Should be invalid - too close to first position
-        assert!(!is_valid_spawn_position(position, &existing, 6.0));
+        assert!(!is_valid_spawn_position(position, &existing, Distance::new(6.0)));
     }
 
     #[test]
     fn test_counter_spread() {
         let positions: Vec<Vec3> = (0..8)
-            .map(|i| generate_respawn_position(i, 5.0, 10.0))
+            .map(|i| generate_respawn_position(i, Distance::new(5.0), Distance::new(10.0)).unwrap())
             .collect();
         
         // All positions should be different
@@ -88,10 +108,28 @@ mod tests {
         
         // With 8 positions, we should have decent angular spread
         let mut sorted_angles = angles.clone();
-        sorted_angles.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted_angles.sort_by(|a, b| a.partial_cmp(b).expect("NaN in angle comparison"));
         
         // Check that we don't have all angles clustered together
-        let angle_span = sorted_angles.last().unwrap() - sorted_angles.first().unwrap();
-        assert!(angle_span > 1.0); // Should span more than 1 radian
+        if let (Some(first), Some(last)) = (sorted_angles.first(), sorted_angles.last()) {
+            let angle_span = last - first;
+            assert!(angle_span > 1.0); // Should span more than 1 radian
+        } else {
+            panic!("Expected non-empty angles vector");
+        }
+    }
+
+    #[test]
+    fn test_invalid_spawn_parameters() {
+        // min_distance >= max_distance should return error
+        let result = generate_respawn_position(0, Distance::new(10.0), Distance::new(5.0));
+        assert!(result.is_err());
+        
+        let result = generate_respawn_position(0, Distance::new(5.0), Distance::new(5.0));
+        assert!(result.is_err());
+        
+        // Fallback function should handle errors gracefully
+        let pos = generate_respawn_position_unchecked(0, Distance::new(10.0), Distance::new(5.0));
+        assert_eq!(pos, Vec3::new(5.0, 1.0, 0.0)); // Fallback position
     }
 }

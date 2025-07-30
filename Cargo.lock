@@ -2844,9 +2844,11 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_lunex",
+ "derive_more",
  "dirs",
  "rand 0.8.5",
  "serde",
+ "thiserror 2.0.12",
  "toml",
 ]
 

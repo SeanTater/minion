@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use crate::components::AreaEffectType;
+use crate::components::{AreaEffectType, Speed, Distance, Damage};
 use serde::{Deserialize, Serialize};
 
 #[derive(Resource)]
@@ -24,42 +24,42 @@ pub struct RespawnCounter {
 
 #[derive(Resource, Debug, Clone)]
 pub struct CombatConfig {
-    pub bullet_speed: f32,
+    pub bullet_speed: Speed,
     pub bullet_lifetime: f32,
-    pub bullet_damage: i32,
-    pub collision_distance: f32,
+    pub bullet_damage: Damage,
+    pub collision_distance: Distance,
 }
 
 impl Default for CombatConfig {
     fn default() -> Self {
         Self {
-            bullet_speed: 15.0,
+            bullet_speed: Speed::new(15.0),
             bullet_lifetime: 3.0,
-            bullet_damage: 2,
-            collision_distance: 0.6,
+            bullet_damage: Damage::new(2.0),
+            collision_distance: Distance::new(0.6),
         }
     }
 }
 
 #[derive(Resource, Debug, Clone)]
 pub struct EnemyConfig {
-    pub speed: f32,
-    pub health: i32,
-    pub chase_distance: f32,
-    pub spawn_distance_min: f32,
-    pub spawn_distance_max: f32,
-    pub collision_distance: f32,
+    pub speed: Speed,  
+    pub max_health: f32,
+    pub chase_distance: Distance,
+    pub spawn_distance_min: Distance,
+    pub spawn_distance_max: Distance,
+    pub collision_distance: Distance,
 }
 
 impl Default for EnemyConfig {
     fn default() -> Self {
         Self {
-            speed: 3.0,
-            health: 3,
-            chase_distance: 8.0,
-            spawn_distance_min: 5.0,
-            spawn_distance_max: 10.5,
-            collision_distance: 1.2,
+            speed: Speed::new(3.0),
+            max_health: 3.0,
+            chase_distance: Distance::new(8.0),
+            spawn_distance_min: Distance::new(5.0),
+            spawn_distance_max: Distance::new(10.5),
+            collision_distance: Distance::new(1.2),
         }
     }
 }

@@ -145,7 +145,7 @@ fn update_tooltip_health(
             // Find the health bar among the children
             for child in children.iter() {
                 if let Ok(mut health_bar) = tooltip_health_query.get_mut(child) {
-                    let health_percent = enemy.health as f32 / 100.0; // Assuming max health is 100
+                    let health_percent = enemy.health.percentage();
                     health_bar.width = Val::Percent(health_percent * 100.0);
                 }
             }
