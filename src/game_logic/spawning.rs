@@ -1,11 +1,12 @@
 use bevy::prelude::*;
+use crate::components::Distance;
 use std::f32::consts::TAU;
 
 /// Generate a random spawn position in a ring around the origin
 /// Uses a counter for deterministic positioning that spreads enemies around
-pub fn generate_respawn_position(counter: u32, min_distance: f32, max_distance: f32) -> Vec3 {
+pub fn generate_respawn_position(counter: u32, min_distance: Distance, max_distance: Distance) -> Vec3 {
     let angle = (counter as f32 * 2.3) % TAU; // Use prime-like multiplier for spread
-    let distance = min_distance + (counter % 4) as f32 * (max_distance - min_distance) / 4.0;
+    let distance = min_distance.0 + (counter % 4) as f32 * (max_distance.0 - min_distance.0) / 4.0;
     
     Vec3::new(
         angle.cos() * distance,
@@ -18,10 +19,10 @@ pub fn generate_respawn_position(counter: u32, min_distance: f32, max_distance: 
 pub fn is_valid_spawn_position(
     position: Vec3,
     existing_positions: &[Vec3],
-    min_distance: f32,
+    min_distance: Distance,
 ) -> bool {
     for &existing_pos in existing_positions {
-        if position.distance(existing_pos) < min_distance {
+        if position.distance(existing_pos) < min_distance.0 {
             return false;
         }
     }
@@ -34,8 +35,8 @@ mod tests {
 
     #[test]
     fn test_respawn_position_generation() {
-        let pos1 = generate_respawn_position(0, 5.0, 10.0);
-        let pos2 = generate_respawn_position(1, 5.0, 10.0);
+        let pos1 = generate_respawn_position(0, Distance::new(5.0), Distance::new(10.0));
+        let pos2 = generate_respawn_position(1, Distance::new(5.0), Distance::new(10.0));
         
         // Positions should be different
         assert_ne!(pos1, pos2);
@@ -60,17 +61,17 @@ mod tests {
             Vec3::new(10.0, 1.0, 0.0),
         ];
         
-        // Should be valid - far enough from existing positions
-        assert!(is_valid_spawn_position(position, &existing, 2.0));
+        // Should be valid - far enough from existing positions  
+        assert!(is_valid_spawn_position(position, &existing, Distance::new(2.0)));
         
         // Should be invalid - too close to first position
-        assert!(!is_valid_spawn_position(position, &existing, 6.0));
+        assert!(!is_valid_spawn_position(position, &existing, Distance::new(6.0)));
     }
 
     #[test]
     fn test_counter_spread() {
         let positions: Vec<Vec3> = (0..8)
-            .map(|i| generate_respawn_position(i, 5.0, 10.0))
+            .map(|i| generate_respawn_position(i, Distance::new(5.0), Distance::new(10.0)))
             .collect();
         
         // All positions should be different

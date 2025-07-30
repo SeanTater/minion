@@ -37,7 +37,7 @@ fn spawn_enemies(
             Transform::from_translation(pos),
             Enemy {
                 speed: enemy_config.speed,
-                health: enemy_config.health,
+                health: HealthPool::new_full(enemy_config.max_health),
                 chase_distance: enemy_config.chase_distance,
                 is_dying: false,
             },
@@ -61,7 +61,7 @@ fn enemy_ai(
                 .translation
                 .distance(player_transform.translation);
 
-            if distance <= enemy.chase_distance && distance > 1.0 {
+            if distance <= enemy.chase_distance.0 && distance > 1.0 {
                 let direction =
                     (player_transform.translation - enemy_transform.translation).normalize();
                 enemy_transform.translation += direction * enemy.speed * time.delta_secs();

@@ -348,24 +348,24 @@ fn update_hud(
     if let Ok(player) = player_query.single() {
         // Update health bar
         if let Ok(mut health_bar) = health_bar_query.single_mut() {
-            let health_percent = player.health as f32 / player.max_health as f32;
+            let health_percent = player.health.percentage();
             health_bar.width = Val::Percent(health_percent * 100.0);
         }
         
         // Update mana bar
         if let Ok(mut mana_bar) = mana_bar_query.single_mut() {
-            let mana_percent = player.mana as f32 / player.max_mana as f32;
+            let mana_percent = player.mana.percentage();
             mana_bar.width = Val::Percent(mana_percent * 100.0);
         }
         
         // Update health text
         if let Ok(mut health_text) = health_text_query.single_mut() {
-            **health_text = format!("HP: {}/{}", player.health, player.max_health);
+            **health_text = format!("HP: {}", player.health);
         }
         
         // Update mana text
         if let Ok(mut mana_text) = mana_text_query.single_mut() {
-            **mana_text = format!("MP: {}/{}", player.mana, player.max_mana);
+            **mana_text = format!("MP: {}", player.mana);
         }
     }
 }

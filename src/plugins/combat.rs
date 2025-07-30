@@ -86,7 +86,7 @@ fn handle_combat_input(
         if let Ok(player_transform) = player_query.single() {
             let effect_type = selected_effect.effect_type;
             commands.spawn((
-                Mesh3d(meshes.add(Cylinder::new(effect_type.radius(), 0.1))),
+                Mesh3d(meshes.add(Cylinder::new(effect_type.radius().0, 0.1))),
                 MeshMaterial3d(materials.add(StandardMaterial {
                     base_color: effect_type.base_color(),
                     alpha_mode: AlphaMode::Blend,
@@ -160,13 +160,13 @@ fn bullet_enemy_collision(
                 combat_config.collision_distance,
             ) {
                 // Damage enemy
-                enemy.health -= bullet.damage;
+                enemy.health.take_damage(bullet.damage);
                 
                 // Remove bullet
                 commands.entity(bullet_entity).despawn();
                 
                 // Kill enemy if health depleted
-                if enemy.health <= 0 && !enemy.is_dying {
+                if enemy.health.is_dead() && !enemy.is_dying {
                     enemy.is_dying = true;
                     game_config.score += 10; // 10 points per enemy
                     commands.entity(enemy_entity).despawn();
@@ -188,7 +188,7 @@ fn bullet_enemy_collision(
                         Transform::from_translation(respawn_pos),
                         Enemy {
                             speed: enemy_config.speed,
-                            health: enemy_config.health,
+                            health: HealthPool::new_full(enemy_config.max_health),
                             chase_distance: enemy_config.chase_distance,
                             is_dying: false,
                         },
@@ -223,10 +223,10 @@ fn area_effect_damage(
                 effect.effect_type.radius(),
             ) {
                 if !enemy.is_dying {
-                    enemy.health -= damage;
+                    enemy.health.take_damage(damage);
                     
                     // Kill enemy if health depleted
-                    if enemy.health <= 0 && !enemy.is_dying {
+                    if enemy.health.is_dead() && !enemy.is_dying {
                         enemy.is_dying = true;
                         game_config.score += 10; // 10 points per enemy
                         commands.entity(enemy_entity).despawn();
@@ -248,7 +248,7 @@ fn area_effect_damage(
                             Transform::from_translation(respawn_pos),
                             Enemy {
                                 speed: enemy_config.speed,
-                                health: enemy_config.health,
+                                health: HealthPool::new_full(enemy_config.max_health),
                                 chase_distance: enemy_config.chase_distance,
                                 is_dying: false,
                             },
