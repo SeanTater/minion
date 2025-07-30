@@ -12,18 +12,14 @@ impl Plugin for UiPlugin {
         app.init_state::<GameState>()
             .insert_resource(GameConfig::default())
             .insert_resource(UsernameInput::default())
-            .add_systems(Startup, (load_game_config, setup_simple_ui))
+            .add_systems(Startup, load_game_config)
             .add_systems(
                 Update,
-                (
-                    handle_simple_input,
-                    handle_exit_events,
-                    handle_username_input,
-                ),
+                handle_exit_events,
             )
             .add_systems(
                 OnEnter(GameState::Playing),
-                (cleanup_main_menu, setup_game_ui_simple),
+                setup_game_ui_simple,
             )
             .add_systems(Update, update_hud.run_if(in_state(GameState::Playing)));
     }
