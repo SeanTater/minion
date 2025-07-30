@@ -12,6 +12,7 @@ impl Plugin for CombatPlugin {
     fn build(&self, app: &mut App) {
         app
             .init_resource::<CombatConfig>()
+            .init_resource::<SelectedAreaEffect>()
             .init_resource::<ObjectPool<Bullet>>()
             .add_systems(Update, (
                 handle_combat_input,
@@ -33,6 +34,7 @@ fn handle_combat_input(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     combat_config: Res<CombatConfig>,
+    mut selected_effect: ResMut<SelectedAreaEffect>,
 ) {
     let window = windows.single();
     if let Some(cursor_pos) = window.cursor_position() {
@@ -73,14 +75,23 @@ fn handle_combat_input(
         }
     }
     
+    // Tab: Cycle area effect type
+    if keyboard.just_pressed(KeyCode::Tab) {
+        selected_effect.effect_type = match selected_effect.effect_type {
+            AreaEffectType::Magic => AreaEffectType::Poison,
+            AreaEffectType::Poison => AreaEffectType::Magic,
+        };
+    }
+    
     // Spacebar: Area effect
     if keyboard.just_pressed(KeyCode::Space) {
         if let Ok(player_transform) = player_query.get_single() {
+            let effect_type = selected_effect.effect_type;
             commands.spawn((
                 PbrBundle {
-                    mesh: meshes.add(Cylinder::new(combat_config.area_effect_radius, 0.1)),
+                    mesh: meshes.add(Cylinder::new(effect_type.radius(), 0.1)),
                     material: materials.add(StandardMaterial {
-                        base_color: Color::srgba(0.5, 0.0, 1.0, 0.3),
+                        base_color: effect_type.base_color(),
                         alpha_mode: AlphaMode::Blend,
                         ..default()
                     }),
@@ -88,9 +99,7 @@ fn handle_combat_input(
                     ..default()
                 },
                 AreaEffect {
-                    radius: combat_config.area_effect_radius,
-                    damage_per_second: combat_config.area_effect_dps,
-                    duration: combat_config.area_effect_duration,
+                    effect_type,
                     elapsed: 0.0,
                 },
             ));
@@ -126,11 +135,12 @@ fn update_area_effects(
         effect.elapsed += time.delta_seconds();
         
         // Fade effect over time
-        let alpha = 1.0 - (effect.elapsed / effect.duration);
+        let duration = effect.effect_type.duration();
+        let alpha = 1.0 - (effect.elapsed / duration);
         transform.scale = Vec3::splat(alpha.max(0.1));
         
         // Despawn when duration expires
-        if effect.elapsed >= effect.duration {
+        if effect.elapsed >= duration {
             commands.entity(entity).despawn();
         }
     }
@@ -210,11 +220,11 @@ fn area_effect_damage(
     for (effect_transform, effect) in effect_query.iter() {
         for (enemy_entity, enemy_transform, mut enemy) in enemy_query.iter_mut() {
             if let Some(damage) = calculate_area_damage(
-                effect.damage_per_second,
+                effect.effect_type.damage_per_second(),
                 time.delta_seconds(),
                 enemy_transform.translation,
                 effect_transform.translation,
-                effect.radius,
+                effect.effect_type.radius(),
             ) {
                 if !enemy.is_dying {
                     enemy.health -= damage;

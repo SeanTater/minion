@@ -30,10 +30,44 @@ pub struct Bullet {
     pub damage: i32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum AreaEffectType {
+    Magic,
+    Poison,
+}
+
+impl AreaEffectType {
+    pub fn damage_per_second(&self) -> i32 {
+        match self {
+            AreaEffectType::Magic => 150,
+            AreaEffectType::Poison => 80,
+        }
+    }
+    
+    pub fn radius(&self) -> f32 {
+        match self {
+            AreaEffectType::Magic => 3.0,
+            AreaEffectType::Poison => 4.0,
+        }
+    }
+    
+    pub fn duration(&self) -> f32 {
+        match self {
+            AreaEffectType::Magic => 2.0,
+            AreaEffectType::Poison => 4.0,
+        }
+    }
+    
+    pub fn base_color(&self) -> Color {
+        match self {
+            AreaEffectType::Magic => Color::srgba(0.0, 0.5, 1.0, 0.3),
+            AreaEffectType::Poison => Color::srgba(0.0, 1.0, 0.2, 0.3),
+        }
+    }
+}
+
 #[derive(Component)]
 pub struct AreaEffect {
-    pub radius: f32,
-    pub damage_per_second: i32,
-    pub duration: f32,
+    pub effect_type: AreaEffectType,
     pub elapsed: f32,
 }

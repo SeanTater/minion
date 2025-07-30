@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use crate::components::AreaEffectType;
 
 #[derive(Resource)]
 pub struct ObjectPool<T: Component> {
@@ -25,11 +26,7 @@ pub struct CombatConfig {
     pub bullet_speed: f32,
     pub bullet_lifetime: f32,
     pub bullet_damage: i32,
-    pub area_effect_radius: f32,
-    pub area_effect_dps: i32,
-    pub area_effect_duration: f32,
     pub collision_distance: f32,
-    pub enemy_collision_distance: f32,
 }
 
 impl Default for CombatConfig {
@@ -38,11 +35,7 @@ impl Default for CombatConfig {
             bullet_speed: 15.0,
             bullet_lifetime: 3.0,
             bullet_damage: 2,
-            area_effect_radius: 3.0,
-            area_effect_dps: 100,
-            area_effect_duration: 2.0,
             collision_distance: 0.6,
-            enemy_collision_distance: 1.2,
         }
     }
 }
@@ -66,6 +59,19 @@ impl Default for EnemyConfig {
             spawn_distance_min: 5.0,
             spawn_distance_max: 10.5,
             collision_distance: 1.2,
+        }
+    }
+}
+
+#[derive(Resource)]
+pub struct SelectedAreaEffect {
+    pub effect_type: AreaEffectType,
+}
+
+impl Default for SelectedAreaEffect {
+    fn default() -> Self {
+        Self {
+            effect_type: AreaEffectType::Magic,
         }
     }
 }
