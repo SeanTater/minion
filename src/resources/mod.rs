@@ -2,20 +2,6 @@ use bevy::prelude::*;
 use crate::components::{AreaEffectType, Speed, Distance, Damage};
 use serde::{Deserialize, Serialize};
 
-#[derive(Resource)]
-pub struct ObjectPool<T: Component> {
-    pub available: Vec<Entity>,
-    pub _phantom: std::marker::PhantomData<T>,
-}
-
-impl<T: Component> Default for ObjectPool<T> {
-    fn default() -> Self {
-        Self {
-            available: Vec::new(),
-            _phantom: std::marker::PhantomData,
-        }
-    }
-}
 
 #[derive(Resource)]
 pub struct RespawnCounter {

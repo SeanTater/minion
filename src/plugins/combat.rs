@@ -14,7 +14,6 @@ impl Plugin for CombatPlugin {
         app
             .init_resource::<CombatConfig>()
             .init_resource::<SelectedAreaEffect>()
-            .init_resource::<ObjectPool<Bullet>>()
             .add_systems(Update, (
                 handle_combat_input,
                 update_bullets,
@@ -23,6 +22,32 @@ impl Plugin for CombatPlugin {
                 area_effect_damage,
             ).run_if(in_state(GameState::Playing)));
     }
+}
+
+fn spawn_enemy(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+    position: Vec3,
+    enemy_config: &EnemyConfig,
+) {
+    commands.spawn((
+        Mesh3d(meshes.add(Sphere::new(0.5))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.8, 0.1, 0.1),
+            ..default()
+        })),
+        Transform::from_translation(position),
+        Enemy {
+            speed: enemy_config.speed,
+            health: HealthPool::new_full(enemy_config.max_health),
+            mana: ManaPool::new_full(25.0),
+            energy: EnergyPool::new_full(50.0),
+            chase_distance: enemy_config.chase_distance,
+            is_dying: false,
+        },
+        Name(generate_dark_name()),
+    ));
 }
 
 fn handle_combat_input(
@@ -179,23 +204,7 @@ fn bullet_enemy_collision(
                     );
                     respawn_counter.count += 1;
                     
-                    commands.spawn((
-                        Mesh3d(meshes.add(Sphere::new(0.5))),
-                        MeshMaterial3d(materials.add(StandardMaterial {
-                            base_color: Color::srgb(0.8, 0.1, 0.1),
-                            ..default()
-                        })),
-                        Transform::from_translation(respawn_pos),
-                        Enemy {
-                            speed: enemy_config.speed,
-                            health: HealthPool::new_full(enemy_config.max_health),
-                            mana: ManaPool::new_full(25.0),
-                            energy: EnergyPool::new_full(50.0),
-                            chase_distance: enemy_config.chase_distance,
-                            is_dying: false,
-                        },
-                        Name(generate_dark_name()),
-                    ));
+                    spawn_enemy(&mut commands, &mut meshes, &mut materials, respawn_pos, &enemy_config);
                 }
                 break;
             }
@@ -241,23 +250,7 @@ fn area_effect_damage(
                         );
                         respawn_counter.count += 1;
                         
-                        commands.spawn((
-                            Mesh3d(meshes.add(Sphere::new(0.5))),
-                            MeshMaterial3d(materials.add(StandardMaterial {
-                                base_color: Color::srgb(0.8, 0.1, 0.1),
-                                ..default()
-                            })),
-                            Transform::from_translation(respawn_pos),
-                            Enemy {
-                                speed: enemy_config.speed,
-                                health: HealthPool::new_full(enemy_config.max_health),
-                                mana: ManaPool::new_full(25.0),
-                                energy: EnergyPool::new_full(50.0),
-                                chase_distance: enemy_config.chase_distance,
-                                is_dying: false,
-                            },
-                            Name(generate_dark_name()),
-                        ));
+                        spawn_enemy(&mut commands, &mut meshes, &mut materials, respawn_pos, &enemy_config);
                     }
                 }
             }

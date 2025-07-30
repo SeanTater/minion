@@ -2,7 +2,7 @@ use crate::components::{*, ResourceType, ResourceDisplay};
 use crate::config::{load_config_or_default, save_config};
 use crate::resources::*;
 use bevy::app::AppExit;
-use bevy::input::keyboard::KeyboardInput;
+use bevy::input::keyboard::{KeyboardInput, Key};
 use bevy::prelude::*;
 
 pub struct UiPlugin;
@@ -358,66 +358,43 @@ fn update_hud(
 
 fn handle_username_input(
     mut username_input: ResMut<UsernameInput>,
-    mut key_events: EventReader<KeyboardInput>,
-    keys: Res<ButtonInput<KeyCode>>,
+    mut keyboard_events: EventReader<KeyboardInput>,
     username_display_query: Query<&Children, With<UsernameDisplay>>,
     mut text_query: Query<&mut Text>,
     game_config: Res<GameConfig>,
 ) {
-    // Handle character input via keyboard events
-    for event in key_events.read() {
-        if event.state.is_pressed() {
-            match event.key_code {
-                KeyCode::KeyA => username_input.text.push('a'),
-                KeyCode::KeyB => username_input.text.push('b'),
-                KeyCode::KeyC => username_input.text.push('c'),
-                KeyCode::KeyD => username_input.text.push('d'),
-                KeyCode::KeyE => username_input.text.push('e'),
-                KeyCode::KeyF => username_input.text.push('f'),
-                KeyCode::KeyG => username_input.text.push('g'),
-                KeyCode::KeyH => username_input.text.push('h'),
-                KeyCode::KeyI => username_input.text.push('i'),
-                KeyCode::KeyJ => username_input.text.push('j'),
-                KeyCode::KeyK => username_input.text.push('k'),
-                KeyCode::KeyL => username_input.text.push('l'),
-                KeyCode::KeyM => username_input.text.push('m'),
-                KeyCode::KeyN => username_input.text.push('n'),
-                KeyCode::KeyO => username_input.text.push('o'),
-                KeyCode::KeyP => username_input.text.push('p'),
-                KeyCode::KeyQ => username_input.text.push('q'),
-                KeyCode::KeyR => username_input.text.push('r'),
-                KeyCode::KeyS => username_input.text.push('s'),
-                KeyCode::KeyT => username_input.text.push('t'),
-                KeyCode::KeyU => username_input.text.push('u'),
-                KeyCode::KeyV => username_input.text.push('v'),
-                KeyCode::KeyW => username_input.text.push('w'),
-                KeyCode::KeyX => username_input.text.push('x'),
-                KeyCode::KeyY => username_input.text.push('y'),
-                KeyCode::KeyZ => username_input.text.push('z'),
-                KeyCode::Space => username_input.text.push(' '),
-                KeyCode::Digit1 => username_input.text.push('1'),
-                KeyCode::Digit2 => username_input.text.push('2'),
-                KeyCode::Digit3 => username_input.text.push('3'),
-                KeyCode::Digit4 => username_input.text.push('4'),
-                KeyCode::Digit5 => username_input.text.push('5'),
-                KeyCode::Digit6 => username_input.text.push('6'),
-                KeyCode::Digit7 => username_input.text.push('7'),
-                KeyCode::Digit8 => username_input.text.push('8'),
-                KeyCode::Digit9 => username_input.text.push('9'),
-                KeyCode::Digit0 => username_input.text.push('0'),
-                _ => {}
-            }
-
-            // Limit username length
-            if username_input.text.len() > 20 {
-                username_input.text.truncate(20);
-            }
+    // Handle keyboard input events
+    for event in keyboard_events.read() {
+        // Only process key presses, not releases
+        if !event.state.is_pressed() {
+            continue;
         }
-    }
 
-    // Handle backspace
-    if keys.just_pressed(KeyCode::Backspace) {
-        username_input.text.pop();
+        match &event.logical_key {
+            Key::Character(character) => {
+                // Allow alphanumeric characters, spaces, underscores, and hyphens
+                for ch in character.chars() {
+                    if ch.is_alphanumeric() || ch == ' ' || ch == '_' || ch == '-' {
+                        username_input.text.push(ch);
+                    }
+                }
+                
+                // Limit username length
+                if username_input.text.len() > 20 {
+                    username_input.text.truncate(20);
+                }
+            }
+            Key::Space => {
+                username_input.text.push(' ');
+                if username_input.text.len() > 20 {
+                    username_input.text.truncate(20);
+                }
+            }
+            Key::Backspace => {
+                username_input.text.pop();
+            }
+            _ => {}
+        }
     }
 
     // Update display text
