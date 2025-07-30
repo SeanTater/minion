@@ -12,6 +12,7 @@ fn main() {
             ..default()
         }))
         .add_plugins((
+            UiPlugin,
             ScenePlugin,
             PlayerPlugin,
             EnemyPlugin,

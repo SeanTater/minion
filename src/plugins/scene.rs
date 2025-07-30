@@ -1,13 +1,14 @@
 use bevy::prelude::*;
 use crate::components::*;
+use crate::resources::GameState;
 
 pub struct ScenePlugin;
 
 impl Plugin for ScenePlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_systems(Startup, setup_scene)
-            .add_systems(Update, follow_camera);
+            .add_systems(OnEnter(GameState::Playing), setup_scene)
+            .add_systems(Update, follow_camera.run_if(in_state(GameState::Playing)));
     }
 }
 

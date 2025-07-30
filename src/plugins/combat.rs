@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
+use bevy::prelude::Camera3d;
 use crate::{
     components::*,
     resources::*,
@@ -20,7 +21,7 @@ impl Plugin for CombatPlugin {
                 update_area_effects,
                 bullet_enemy_collision,
                 area_effect_damage,
-            ));
+            ).run_if(in_state(GameState::Playing)));
     }
 }
 
@@ -30,7 +31,7 @@ fn handle_combat_input(
     mouse_button: Res<ButtonInput<MouseButton>>,
     keyboard: Res<ButtonInput<KeyCode>>,
     windows: Query<&Window, With<PrimaryWindow>>,
-    camera_query: Query<(&Camera, &GlobalTransform)>,
+    camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     combat_config: Res<CombatConfig>,
@@ -153,6 +154,7 @@ fn bullet_enemy_collision(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut respawn_counter: ResMut<RespawnCounter>,
+    mut game_config: ResMut<GameConfig>,
     combat_config: Res<CombatConfig>,
     enemy_config: Res<EnemyConfig>,
 ) {
@@ -172,6 +174,7 @@ fn bullet_enemy_collision(
                 // Kill enemy if health depleted
                 if enemy.health <= 0 && !enemy.is_dying {
                     enemy.is_dying = true;
+                    game_config.score += 10; // 10 points per enemy
                     commands.entity(enemy_entity).despawn();
                     
                     // Respawn enemy at random position
@@ -213,6 +216,7 @@ fn area_effect_damage(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut respawn_counter: ResMut<RespawnCounter>,
+    mut game_config: ResMut<GameConfig>,
     _combat_config: Res<CombatConfig>,
     enemy_config: Res<EnemyConfig>,
     time: Res<Time>,
@@ -232,6 +236,7 @@ fn area_effect_damage(
                     // Kill enemy if health depleted
                     if enemy.health <= 0 && !enemy.is_dying {
                         enemy.is_dying = true;
+                        game_config.score += 10; // 10 points per enemy
                         commands.entity(enemy_entity).despawn();
                         
                         // Respawn enemy at random position
