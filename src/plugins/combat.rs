@@ -37,11 +37,11 @@ fn handle_combat_input(
     combat_config: Res<CombatConfig>,
     mut selected_effect: ResMut<SelectedAreaEffect>,
 ) {
-    let window = windows.single();
+    let Ok(window) = windows.single() else { return; };
     if let Some(cursor_pos) = window.cursor_position() {
-        let (camera, camera_transform) = camera_query.single();
+        let Ok((camera, camera_transform)) = camera_query.single() else { return; };
         
-        if let Some(ray) = camera.viewport_to_world(camera_transform, cursor_pos) {
+        if let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_pos) {
             let ground_y = 0.0;
             if ray.direction.y < 0.0 {
                 let t = (ground_y - ray.origin.y) / ray.direction.y;
@@ -49,20 +49,17 @@ fn handle_combat_input(
                 
                 // Right click: Fire bullet
                 if mouse_button.just_pressed(MouseButton::Right) {
-                    if let Ok(player_transform) = player_query.get_single() {
+                    if let Ok(player_transform) = player_query.single() {
                         let direction = (world_pos - player_transform.translation).normalize();
                         
                         commands.spawn((
-                            PbrBundle {
-                                mesh: meshes.add(Sphere::new(0.1)),
-                                material: materials.add(StandardMaterial {
-                                    base_color: Color::srgb(1.0, 1.0, 0.0),
-                                    emissive: Color::srgb(0.5, 0.5, 0.0).into(),
-                                    ..default()
-                                }),
-                                transform: Transform::from_translation(player_transform.translation + Vec3::Y * 0.5),
+                            Mesh3d(meshes.add(Sphere::new(0.1))),
+                            MeshMaterial3d(materials.add(StandardMaterial {
+                                base_color: Color::srgb(1.0, 1.0, 0.0),
+                                emissive: Color::srgb(0.5, 0.5, 0.0).into(),
                                 ..default()
-                            },
+                            })),
+                            Transform::from_translation(player_transform.translation + Vec3::Y * 0.5),
                             Bullet {
                                 direction: Vec3::new(direction.x, 0.0, direction.z).normalize(),
                                 speed: combat_config.bullet_speed,
@@ -86,19 +83,16 @@ fn handle_combat_input(
     
     // Spacebar: Area effect
     if keyboard.just_pressed(KeyCode::Space) {
-        if let Ok(player_transform) = player_query.get_single() {
+        if let Ok(player_transform) = player_query.single() {
             let effect_type = selected_effect.effect_type;
             commands.spawn((
-                PbrBundle {
-                    mesh: meshes.add(Cylinder::new(effect_type.radius(), 0.1)),
-                    material: materials.add(StandardMaterial {
-                        base_color: effect_type.base_color(),
-                        alpha_mode: AlphaMode::Blend,
-                        ..default()
-                    }),
-                    transform: Transform::from_translation(player_transform.translation),
+                Mesh3d(meshes.add(Cylinder::new(effect_type.radius(), 0.1))),
+                MeshMaterial3d(materials.add(StandardMaterial {
+                    base_color: effect_type.base_color(),
+                    alpha_mode: AlphaMode::Blend,
                     ..default()
-                },
+                })),
+                Transform::from_translation(player_transform.translation),
                 AreaEffect {
                     effect_type,
                     elapsed: 0.0,
@@ -115,10 +109,10 @@ fn update_bullets(
 ) {
     for (entity, mut transform, mut bullet) in bullet_query.iter_mut() {
         // Move bullet
-        transform.translation += bullet.direction * bullet.speed * time.delta_seconds();
+        transform.translation += bullet.direction * bullet.speed * time.delta_secs();
         
         // Update lifetime
-        bullet.lifetime -= time.delta_seconds();
+        bullet.lifetime -= time.delta_secs();
         
         // Despawn when lifetime expires
         if bullet.lifetime <= 0.0 {
@@ -133,7 +127,7 @@ fn update_area_effects(
     time: Res<Time>,
 ) {
     for (entity, mut effect, mut transform) in effect_query.iter_mut() {
-        effect.elapsed += time.delta_seconds();
+        effect.elapsed += time.delta_secs();
         
         // Fade effect over time
         let duration = effect.effect_type.duration();
@@ -186,21 +180,19 @@ fn bullet_enemy_collision(
                     respawn_counter.count += 1;
                     
                     commands.spawn((
-                        PbrBundle {
-                            mesh: meshes.add(Sphere::new(0.5)),
-                            material: materials.add(StandardMaterial {
-                                base_color: Color::srgb(0.8, 0.1, 0.1),
-                                ..default()
-                            }),
-                            transform: Transform::from_translation(respawn_pos),
+                        Mesh3d(meshes.add(Sphere::new(0.5))),
+                        MeshMaterial3d(materials.add(StandardMaterial {
+                            base_color: Color::srgb(0.8, 0.1, 0.1),
                             ..default()
-                        },
+                        })),
+                        Transform::from_translation(respawn_pos),
                         Enemy {
                             speed: enemy_config.speed,
                             health: enemy_config.health,
                             chase_distance: enemy_config.chase_distance,
                             is_dying: false,
                         },
+                        Name(generate_dark_name()),
                     ));
                 }
                 break;
@@ -225,7 +217,7 @@ fn area_effect_damage(
         for (enemy_entity, enemy_transform, mut enemy) in enemy_query.iter_mut() {
             if let Some(damage) = calculate_area_damage(
                 effect.effect_type.damage_per_second(),
-                time.delta_seconds(),
+                time.delta_secs(),
                 enemy_transform.translation,
                 effect_transform.translation,
                 effect.effect_type.radius(),
@@ -248,21 +240,19 @@ fn area_effect_damage(
                         respawn_counter.count += 1;
                         
                         commands.spawn((
-                            PbrBundle {
-                                mesh: meshes.add(Sphere::new(0.5)),
-                                material: materials.add(StandardMaterial {
-                                    base_color: Color::srgb(0.8, 0.1, 0.1),
-                                    ..default()
-                                }),
-                                transform: Transform::from_translation(respawn_pos),
+                            Mesh3d(meshes.add(Sphere::new(0.5))),
+                            MeshMaterial3d(materials.add(StandardMaterial {
+                                base_color: Color::srgb(0.8, 0.1, 0.1),
                                 ..default()
-                            },
+                            })),
+                            Transform::from_translation(respawn_pos),
                             Enemy {
                                 speed: enemy_config.speed,
                                 health: enemy_config.health,
                                 chase_distance: enemy_config.chase_distance,
                                 is_dying: false,
                             },
+                            Name(generate_dark_name()),
                         ));
                     }
                 }

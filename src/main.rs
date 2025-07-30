@@ -17,6 +17,7 @@ fn main() {
             PlayerPlugin,
             EnemyPlugin,
             CombatPlugin,
+            TooltipPlugin,
         ))
         .run();
 }
