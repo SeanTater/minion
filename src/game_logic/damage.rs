@@ -60,20 +60,20 @@ mod tests {
     #[test]
     fn test_area_damage_direct_hit() {
         let damage = calculate_area_damage(
-            Damage::new(100), // 100 DPS
+            Damage::new(100.0), // 100 DPS
             0.016, // ~60fps delta time
             Vec3::ZERO,
             Vec3::ZERO,
             Distance::new(3.0),
         );
         
-        assert_eq!(damage, Some(Damage::new(1))); // 100 * 1.0 * 0.016 = 1.6 -> 1
+        assert_eq!(damage, Some(Damage::new(1.6))); // 100 * 1.0 * 0.016 = 1.6
     }
 
     #[test]
     fn test_area_damage_edge_hit() {
         let damage = calculate_area_damage(
-            Damage::new(100),
+            Damage::new(100.0),
             0.016,
             Vec3::new(3.0, 0.0, 0.0), // At edge of radius
             Vec3::ZERO,
@@ -86,7 +86,7 @@ mod tests {
     #[test]
     fn test_area_damage_partial_hit() {
         let damage = calculate_area_damage(
-            Damage::new(100),
+            Damage::new(100.0),
             0.016,
             Vec3::new(1.5, 0.0, 0.0), // Half distance
             Vec3::ZERO,
@@ -96,13 +96,13 @@ mod tests {
         // Distance = 1.5, radius = 3.0
         // Multiplier = 1.0 - (1.5/3.0) = 0.5
         // Damage = 100 * 0.5 * 0.016 = 0.8 -> 1 (minimum)
-        assert_eq!(damage, Some(Damage::new(1)));
+        assert_eq!(damage, Some(Damage::new(1.0)));
     }
 
     #[test]
     fn test_area_damage_outside_radius() {
         let damage = calculate_area_damage(
-            Damage::new(100),
+            Damage::new(100.0),
             0.016,
             Vec3::new(5.0, 0.0, 0.0),
             Vec3::ZERO,

@@ -1,18 +1,37 @@
 use bevy::prelude::*;
 use crate::components::Distance;
+use crate::game_logic::errors::{GameError, GameResult};
 use std::f32::consts::TAU;
 
 /// Generate a random spawn position in a ring around the origin
 /// Uses a counter for deterministic positioning that spreads enemies around
-pub fn generate_respawn_position(counter: u32, min_distance: Distance, max_distance: Distance) -> Vec3 {
+pub fn generate_respawn_position(counter: u32, min_distance: Distance, max_distance: Distance) -> GameResult<Vec3> {
+    if min_distance.0 >= max_distance.0 {
+        return Err(GameError::InvalidSpawnPosition { 
+            position: Vec3::ZERO 
+        });
+    }
+    
     let angle = (counter as f32 * 2.3) % TAU; // Use prime-like multiplier for spread
     let distance = min_distance.0 + (counter % 4) as f32 * (max_distance.0 - min_distance.0) / 4.0;
     
-    Vec3::new(
+    let position = Vec3::new(
         angle.cos() * distance,
         1.0, // Keep on ground level
         angle.sin() * distance,
-    )
+    );
+    
+    Ok(position)
+}
+
+/// Generate a random spawn position in a ring around the origin (fallback version)
+/// Uses a counter for deterministic positioning that spreads enemies around
+pub fn generate_respawn_position_unchecked(counter: u32, min_distance: Distance, max_distance: Distance) -> Vec3 {
+    generate_respawn_position(counter, min_distance, max_distance)
+        .unwrap_or_else(|err| {
+            eprintln!("Warning: Spawn position generation failed ({}), using fallback", err);
+            Vec3::new(5.0, 1.0, 0.0) // Safe fallback position
+        })
 }
 
 /// Check if a position is valid for spawning (not too close to other entities)
@@ -35,8 +54,8 @@ mod tests {
 
     #[test]
     fn test_respawn_position_generation() {
-        let pos1 = generate_respawn_position(0, Distance::new(5.0), Distance::new(10.0));
-        let pos2 = generate_respawn_position(1, Distance::new(5.0), Distance::new(10.0));
+        let pos1 = generate_respawn_position(0, Distance::new(5.0), Distance::new(10.0)).unwrap();
+        let pos2 = generate_respawn_position(1, Distance::new(5.0), Distance::new(10.0)).unwrap();
         
         // Positions should be different
         assert_ne!(pos1, pos2);
@@ -71,7 +90,7 @@ mod tests {
     #[test]
     fn test_counter_spread() {
         let positions: Vec<Vec3> = (0..8)
-            .map(|i| generate_respawn_position(i, Distance::new(5.0), Distance::new(10.0)))
+            .map(|i| generate_respawn_position(i, Distance::new(5.0), Distance::new(10.0)).unwrap())
             .collect();
         
         // All positions should be different
@@ -94,5 +113,19 @@ mod tests {
         // Check that we don't have all angles clustered together
         let angle_span = sorted_angles.last().unwrap() - sorted_angles.first().unwrap();
         assert!(angle_span > 1.0); // Should span more than 1 radian
+    }
+
+    #[test]
+    fn test_invalid_spawn_parameters() {
+        // min_distance >= max_distance should return error
+        let result = generate_respawn_position(0, Distance::new(10.0), Distance::new(5.0));
+        assert!(result.is_err());
+        
+        let result = generate_respawn_position(0, Distance::new(5.0), Distance::new(5.0));
+        assert!(result.is_err());
+        
+        // Fallback function should handle errors gracefully
+        let pos = generate_respawn_position_unchecked(0, Distance::new(10.0), Distance::new(5.0));
+        assert_eq!(pos, Vec3::new(5.0, 1.0, 0.0)); // Fallback position
     }
 }

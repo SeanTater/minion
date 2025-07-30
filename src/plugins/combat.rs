@@ -172,7 +172,7 @@ fn bullet_enemy_collision(
                     commands.entity(enemy_entity).despawn();
                     
                     // Respawn enemy at random position
-                    let respawn_pos = generate_respawn_position(
+                    let respawn_pos = generate_respawn_position_unchecked(
                         respawn_counter.count,
                         enemy_config.spawn_distance_min,
                         enemy_config.spawn_distance_max,
@@ -232,7 +232,7 @@ fn area_effect_damage(
                         commands.entity(enemy_entity).despawn();
                         
                         // Respawn enemy at random position
-                        let respawn_pos = generate_respawn_position(
+                        let respawn_pos = generate_respawn_position_unchecked(
                             respawn_counter.count,
                             enemy_config.spawn_distance_min,
                             enemy_config.spawn_distance_max,

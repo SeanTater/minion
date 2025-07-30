@@ -1,7 +1,9 @@
 pub mod damage;
-pub mod spawning;
+pub mod errors;
 pub mod names;
+pub mod spawning;
 
 pub use damage::*;
-pub use spawning::*;
+pub use errors::*;
 pub use names::*;
+pub use spawning::*;

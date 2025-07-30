@@ -2,8 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Getting Started
+When starting work on this codebase, run `./find-definitions.sh` to get an overview of all code structures and their relationships.
+
 ## Project Overview
-Minion is a Diablo-like action RPG built with Rust and Bevy 0.14. Single-file prototype (185 lines) implementing 3D isometric view with click-to-move mechanics, PBR rendering, and Linux/Wayland support.
+Minion is a Diablo-like action RPG built with Rust and Bevy 0.16. Modular plugin-based architecture with ECS systems, strong typing, and comprehensive error handling.
 
 ## Development Commands
 ```bash

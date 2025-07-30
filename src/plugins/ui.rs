@@ -3,7 +3,7 @@ use bevy::app::AppExit;
 use bevy::window::WindowCloseRequested;
 use bevy::input::keyboard::KeyboardInput;
 use crate::resources::*;
-use crate::config::{load_config, save_config};
+use crate::config::{load_config_or_default, save_config};
 use crate::components::*;
 
 pub struct UiPlugin;
@@ -58,7 +58,7 @@ pub struct ManaBar;
 pub struct ManaText;
 
 fn load_game_config(mut commands: Commands, mut username_input: ResMut<UsernameInput>) {
-    let config = load_config();
+    let config = load_config_or_default();
     
     // Initialize username input with saved username
     username_input.text = config.username.clone();
@@ -175,7 +175,9 @@ fn handle_simple_input(
         // Save username if it was entered
         if !username_input.text.trim().is_empty() {
             game_config.username = username_input.text.trim().to_string();
-            let _ = save_config(&game_config);
+            if let Err(err) = save_config(&game_config) {
+                eprintln!("Warning: Failed to save config: {}", err);
+            }
         }
         next_state.set(GameState::Playing);
     }
