@@ -1,16 +1,11 @@
+use crate::{components::*, game_logic::*, resources::*};
 use bevy::prelude::*;
-use crate::{
-    components::*,
-    resources::*,
-    game_logic::*,
-};
 
 pub struct EnemyPlugin;
 
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
-        app
-            .init_resource::<EnemyConfig>()
+        app.init_resource::<EnemyConfig>()
             .init_resource::<ObjectPool<Enemy>>()
             .insert_resource(RespawnCounter { count: 0 })
             .add_systems(Startup, spawn_enemies)
@@ -26,7 +21,7 @@ fn spawn_enemies(
 ) {
     let spawn_positions = [
         Vec3::new(5.0, 1.0, 5.0),
-        Vec3::new(-5.0, 1.0, 5.0),  
+        Vec3::new(-5.0, 1.0, 5.0),
         Vec3::new(5.0, 1.0, -5.0),
         Vec3::new(-5.0, 1.0, -5.0),
         Vec3::new(0.0, 1.0, 8.0),
@@ -63,11 +58,14 @@ fn enemy_ai(
             if enemy.is_dying {
                 continue; // Skip dying enemies
             }
-            
-            let distance = enemy_transform.translation.distance(player_transform.translation);
-            
+
+            let distance = enemy_transform
+                .translation
+                .distance(player_transform.translation);
+
             if distance <= enemy.chase_distance && distance > 1.0 {
-                let direction = (player_transform.translation - enemy_transform.translation).normalize();
+                let direction =
+                    (player_transform.translation - enemy_transform.translation).normalize();
                 enemy_transform.translation += direction * enemy.speed * time.delta_seconds();
                 enemy_transform.look_to(direction, Vec3::Y);
             }
@@ -80,11 +78,17 @@ fn enemy_collision(
     enemy_config: Res<EnemyConfig>,
 ) {
     let mut combinations = enemy_query.iter_combinations_mut();
-    while let Some([(_entity_a, mut transform_a, enemy_a), (_entity_b, mut transform_b, enemy_b)]) = combinations.fetch_next() {
+    while let Some(
+        [
+            (_entity_a, mut transform_a, enemy_a),
+            (_entity_b, mut transform_b, enemy_b),
+        ],
+    ) = combinations.fetch_next()
+    {
         if enemy_a.is_dying || enemy_b.is_dying {
             continue; // Skip dying enemies
         }
-        
+
         if let Some((push_a, push_b)) = calculate_pushback(
             transform_a.translation,
             transform_b.translation,
@@ -92,7 +96,7 @@ fn enemy_collision(
         ) {
             transform_a.translation += push_a;
             transform_b.translation += push_b;
-            
+
             // Keep enemies on ground
             transform_a.translation.y = 1.0;
             transform_b.translation.y = 1.0;
