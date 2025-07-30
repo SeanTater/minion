@@ -5,8 +5,7 @@ pub struct EnemyPlugin;
 
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<EnemyConfig>()
-            .insert_resource(RespawnCounter { count: 0 })
+        app.insert_resource(RespawnCounter { count: 0 })
             .add_systems(OnEnter(GameState::Playing), spawn_enemies)
             .add_systems(Update, (enemy_ai, enemy_collision).run_if(in_state(GameState::Playing)));
     }
@@ -16,7 +15,7 @@ fn spawn_enemies(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    enemy_config: Res<EnemyConfig>,
+    game_config: Res<GameConfig>,
 ) {
     let spawn_positions = [
         Vec3::new(5.0, 1.0, 5.0),
@@ -35,11 +34,11 @@ fn spawn_enemies(
             })),
             Transform::from_translation(pos),
             Enemy {
-                speed: enemy_config.speed,
-                health: HealthPool::new_full(enemy_config.max_health),
+                speed: Speed::new(game_config.settings.enemy_movement_speed),
+                health: HealthPool::new_full(game_config.settings.enemy_max_health),
                 mana: ManaPool::new_full(25.0),
                 energy: EnergyPool::new_full(50.0),
-                chase_distance: enemy_config.chase_distance,
+                chase_distance: Distance::new(game_config.settings.enemy_chase_distance),
                 is_dying: false,
             },
             Name(generate_dark_name()),
@@ -74,7 +73,7 @@ fn enemy_ai(
 
 fn enemy_collision(
     mut enemy_query: Query<(Entity, &mut Transform, &Enemy), With<Enemy>>,
-    enemy_config: Res<EnemyConfig>,
+    _game_config: Res<GameConfig>,
 ) {
     let mut combinations = enemy_query.iter_combinations_mut();
     while let Some(
@@ -91,7 +90,7 @@ fn enemy_collision(
         if let Some((push_a, push_b)) = calculate_pushback(
             transform_a.translation,
             transform_b.translation,
-            enemy_config.collision_distance,
+            Distance::new(1.2), // collision distance
         ) {
             transform_a.translation += push_a;
             transform_b.translation += push_b;

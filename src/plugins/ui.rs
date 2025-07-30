@@ -1,8 +1,7 @@
 use crate::components::{*, ResourceType, ResourceDisplay};
-use crate::config::{load_config_or_default, save_config};
+use crate::config::load_config_or_default;
 use crate::resources::*;
-use bevy::app::AppExit;
-use bevy::input::keyboard::{KeyboardInput, Key};
+use crate::plugins::ui_common::handle_exit_events;
 use bevy::prelude::*;
 
 pub struct UiPlugin;
@@ -11,7 +10,6 @@ impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
         app.init_state::<GameState>()
             .insert_resource(GameConfig::default())
-            .insert_resource(UsernameInput::default())
             .add_systems(Startup, load_game_config)
             .add_systems(
                 Update,
@@ -21,216 +19,25 @@ impl Plugin for UiPlugin {
                 OnEnter(GameState::Playing),
                 setup_game_ui_simple,
             )
-            .add_systems(Update, update_hud.run_if(in_state(GameState::Playing)));
+            .add_systems(Update, update_hud.run_if(in_state(GameState::Playing)))
+            .add_systems(OnExit(GameState::Playing), cleanup_game_ui);
     }
 }
 
-#[derive(Resource, Default)]
-pub struct UsernameInput {
-    pub text: String,
-}
-
-#[derive(Component)]
-pub struct MainMenuUI;
 
 #[derive(Component)]
 pub struct GameUI;
 
-#[derive(Component)]
-pub struct UsernameDisplay;
-
-#[derive(Component)]
-pub struct StartButton;
-
-#[derive(Component)]
-pub struct ScoreText;
-
 // Old resource bar components removed - now using unified ResourceDisplay
 
-fn load_game_config(mut commands: Commands, mut username_input: ResMut<UsernameInput>) {
+fn load_game_config(mut commands: Commands) {
     let config = load_config_or_default();
-
-    // Initialize username input with saved username
-    username_input.text = config.username.clone();
-
     commands.insert_resource(config);
 }
 
-fn setup_simple_ui(mut commands: Commands, game_config: Res<GameConfig>) {
-    // Create a simple camera for now until we get bevy_lunex working
-    commands.spawn((
-        Camera2d,
-        Camera {
-            order: 1, // Ensure UI camera renders after 3D camera
-            ..default()
-        },
-    ));
 
-    // Add a simple background color
-    commands
-        .spawn((
-            Node {
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                flex_direction: FlexDirection::Column,
-                ..default()
-            },
-            BackgroundColor(Color::srgb(0.1, 0.1, 0.15)),
-            MainMenuUI,
-        ))
-        .with_children(|parent| {
-            // Title
-            parent.spawn((
-                Text::new("MINION"),
-                TextFont {
-                    font_size: 48.0,
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-                Node {
-                    margin: UiRect::all(Val::Px(20.0)),
-                    ..default()
-                },
-            ));
 
-            // Username label
-            parent.spawn((
-                Text::new("Username:"),
-                TextFont {
-                    font_size: 20.0,
-                    ..default()
-                },
-                TextColor(Color::WHITE),
-                Node {
-                    margin: UiRect::top(Val::Px(30.0)),
-                    ..default()
-                },
-            ));
 
-            // Username input box
-            parent
-                .spawn((
-                    Node {
-                        width: Val::Px(300.0),
-                        height: Val::Px(40.0),
-                        margin: UiRect::all(Val::Px(10.0)),
-                        padding: UiRect::all(Val::Px(8.0)),
-                        border: UiRect::all(Val::Px(2.0)),
-                        ..default()
-                    },
-                    BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
-                    BorderColor(Color::srgb(0.5, 0.5, 0.5)),
-                    UsernameDisplay,
-                ))
-                .with_children(|input_parent| {
-                    input_parent.spawn((
-                        Text::new(if game_config.username.is_empty() {
-                            "Enter your name..."
-                        } else {
-                            &game_config.username
-                        }),
-                        TextFont {
-                            font_size: 18.0,
-                            ..default()
-                        },
-                        TextColor(if game_config.username.is_empty() {
-                            Color::srgb(0.5, 0.5, 0.5)
-                        } else {
-                            Color::WHITE
-                        }),
-                    ));
-                });
-
-            // Instructions
-            parent.spawn((
-                Text::new("Type to enter name, Press Enter to play"),
-                TextFont {
-                    font_size: 16.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(0.7, 0.7, 0.7)),
-                Node {
-                    margin: UiRect::all(Val::Px(20.0)),
-                    ..default()
-                },
-            ));
-
-            // Exit instruction
-            parent.spawn((
-                Text::new("Press Escape to exit"),
-                TextFont {
-                    font_size: 14.0,
-                    ..default()
-                },
-                TextColor(Color::srgb(0.5, 0.5, 0.5)),
-                Node {
-                    margin: UiRect::all(Val::Px(10.0)),
-                    ..default()
-                },
-            ));
-        });
-}
-
-fn handle_simple_input(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut next_state: ResMut<NextState<GameState>>,
-    mut game_config: ResMut<GameConfig>,
-    username_input: Res<UsernameInput>,
-) {
-    // Press Enter to start the game
-    if keys.just_pressed(KeyCode::Enter) {
-        // Save username if it was entered
-        if !username_input.text.trim().is_empty() {
-            game_config.username = username_input.text.trim().to_string();
-            if let Err(err) = save_config(&game_config) {
-                eprintln!("Warning: Failed to save config: {}", err);
-            }
-        }
-        next_state.set(GameState::Playing);
-    }
-}
-
-fn handle_exit_events(
-    keys: Res<ButtonInput<KeyCode>>, 
-    mut exit: EventWriter<AppExit>,
-    mut next_state: ResMut<NextState<GameState>>,
-    current_state: Res<State<GameState>>,
-) {
-    if keys.just_pressed(KeyCode::Escape) {
-        match current_state.get() {
-            GameState::Playing => {
-                // From game, go back to main menu
-                next_state.set(GameState::MainMenu);
-            }
-            GameState::Settings => {
-                // From settings, go back to main menu
-                next_state.set(GameState::MainMenu);
-            }
-            GameState::MainMenu => {
-                // From main menu, exit the game
-                exit.write(AppExit::Success);
-            }
-        }
-    }
-}
-
-fn cleanup_main_menu(
-    mut commands: Commands,
-    menu_query: Query<Entity, With<MainMenuUI>>,
-    camera_query: Query<Entity, With<Camera2d>>,
-) {
-    // Remove main menu UI
-    for entity in menu_query.iter() {
-        commands.entity(entity).despawn();
-    }
-
-    // Remove 2D camera to avoid conflicts with 3D camera
-    for entity in camera_query.iter() {
-        commands.entity(entity).despawn();
-    }
-}
 
 fn setup_game_ui_simple(mut commands: Commands) {
     // HUD container
@@ -370,62 +177,13 @@ fn update_hud(
     }
 }
 
-fn handle_username_input(
-    mut username_input: ResMut<UsernameInput>,
-    mut keyboard_events: EventReader<KeyboardInput>,
-    username_display_query: Query<&Children, With<UsernameDisplay>>,
-    mut text_query: Query<&mut Text>,
-    game_config: Res<GameConfig>,
+fn cleanup_game_ui(
+    mut commands: Commands,
+    game_ui_query: Query<Entity, With<GameUI>>,
 ) {
-    // Handle keyboard input events
-    for event in keyboard_events.read() {
-        // Only process key presses, not releases
-        if !event.state.is_pressed() {
-            continue;
-        }
-
-        match &event.logical_key {
-            Key::Character(character) => {
-                // Allow alphanumeric characters, spaces, underscores, and hyphens
-                for ch in character.chars() {
-                    if ch.is_alphanumeric() || ch == ' ' || ch == '_' || ch == '-' {
-                        username_input.text.push(ch);
-                    }
-                }
-                
-                // Limit username length
-                if username_input.text.len() > 20 {
-                    username_input.text.truncate(20);
-                }
-            }
-            Key::Space => {
-                username_input.text.push(' ');
-                if username_input.text.len() > 20 {
-                    username_input.text.truncate(20);
-                }
-            }
-            Key::Backspace => {
-                username_input.text.pop();
-            }
-            _ => {}
-        }
-    }
-
-    // Update display text
-    if let Ok(children) = username_display_query.single() {
-        for child in children.iter() {
-            if let Ok(mut text) = text_query.get_mut(child) {
-                if username_input.text.is_empty() {
-                    if game_config.username.is_empty() {
-                        **text = "Enter your name...".to_string();
-                        // Could set color to gray here if needed
-                    } else {
-                        **text = game_config.username.clone();
-                    }
-                } else {
-                    **text = username_input.text.clone();
-                }
-            }
-        }
+    // Remove all game UI elements when exiting the Playing state
+    for ui_entity in game_ui_query.iter() {
+        commands.entity(ui_entity).despawn();
     }
 }
+

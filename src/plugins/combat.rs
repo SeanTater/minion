@@ -12,7 +12,6 @@ pub struct CombatPlugin;
 impl Plugin for CombatPlugin {
     fn build(&self, app: &mut App) {
         app
-            .init_resource::<CombatConfig>()
             .init_resource::<SelectedAreaEffect>()
             .add_systems(Update, (
                 handle_combat_input,
@@ -29,7 +28,7 @@ fn spawn_enemy(
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     position: Vec3,
-    enemy_config: &EnemyConfig,
+    game_config: &GameConfig,
 ) {
     commands.spawn((
         Mesh3d(meshes.add(Sphere::new(0.5))),
@@ -39,11 +38,11 @@ fn spawn_enemy(
         })),
         Transform::from_translation(position),
         Enemy {
-            speed: enemy_config.speed,
-            health: HealthPool::new_full(enemy_config.max_health),
+            speed: Speed::new(game_config.settings.enemy_movement_speed),
+            health: HealthPool::new_full(game_config.settings.enemy_max_health),
             mana: ManaPool::new_full(25.0),
             energy: EnergyPool::new_full(50.0),
-            chase_distance: enemy_config.chase_distance,
+            chase_distance: Distance::new(game_config.settings.enemy_chase_distance),
             is_dying: false,
         },
         Name(generate_dark_name()),
@@ -59,7 +58,7 @@ fn handle_combat_input(
     camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    combat_config: Res<CombatConfig>,
+    game_config: Res<GameConfig>,
     mut selected_effect: ResMut<SelectedAreaEffect>,
 ) {
     let Ok(window) = windows.single() else { return; };
@@ -87,9 +86,9 @@ fn handle_combat_input(
                             Transform::from_translation(player_transform.translation + Vec3::Y * 0.5),
                             Bullet {
                                 direction: Vec3::new(direction.x, 0.0, direction.z).normalize(),
-                                speed: combat_config.bullet_speed,
-                                lifetime: combat_config.bullet_lifetime,
-                                damage: combat_config.bullet_damage,
+                                speed: Speed::new(game_config.settings.bullet_speed),
+                                lifetime: game_config.settings.bullet_lifetime,
+                                damage: Damage::new(game_config.settings.bullet_damage),
                             },
                         ));
                     }
@@ -111,7 +110,7 @@ fn handle_combat_input(
         if let Ok(player_transform) = player_query.single() {
             let effect_type = selected_effect.effect_type;
             commands.spawn((
-                Mesh3d(meshes.add(Cylinder::new(effect_type.radius().0, 0.1))),
+                Mesh3d(meshes.add(Cylinder::new(effect_type.radius(&game_config.settings).0, 0.1))),
                 MeshMaterial3d(materials.add(StandardMaterial {
                     base_color: effect_type.base_color(),
                     alpha_mode: AlphaMode::Blend,
@@ -174,15 +173,13 @@ fn bullet_enemy_collision(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut respawn_counter: ResMut<RespawnCounter>,
     mut game_config: ResMut<GameConfig>,
-    combat_config: Res<CombatConfig>,
-    enemy_config: Res<EnemyConfig>,
 ) {
     for (bullet_entity, bullet_transform, bullet) in bullet_query.iter() {
         for (enemy_entity, enemy_transform, mut enemy) in enemy_query.iter_mut() {
             if check_collision(
                 bullet_transform.translation,
                 enemy_transform.translation,
-                combat_config.collision_distance,
+                Distance::new(0.6), // collision distance
             ) {
                 // Damage enemy
                 enemy.health.take_damage(bullet.damage);
@@ -193,18 +190,18 @@ fn bullet_enemy_collision(
                 // Kill enemy if health depleted
                 if enemy.health.is_dead() && !enemy.is_dying {
                     enemy.is_dying = true;
-                    game_config.score += 10; // 10 points per enemy
+                    game_config.score += game_config.settings.score_per_enemy;
                     commands.entity(enemy_entity).despawn();
                     
                     // Respawn enemy at random position
                     let respawn_pos = generate_respawn_position_unchecked(
                         respawn_counter.count,
-                        enemy_config.spawn_distance_min,
-                        enemy_config.spawn_distance_max,
+                        Distance::new(5.0), // spawn_distance_min
+                        Distance::new(10.5), // spawn_distance_max
                     );
                     respawn_counter.count += 1;
                     
-                    spawn_enemy(&mut commands, &mut meshes, &mut materials, respawn_pos, &enemy_config);
+                    spawn_enemy(&mut commands, &mut meshes, &mut materials, respawn_pos, &game_config);
                 }
                 break;
             }
@@ -220,18 +217,16 @@ fn area_effect_damage(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut respawn_counter: ResMut<RespawnCounter>,
     mut game_config: ResMut<GameConfig>,
-    _combat_config: Res<CombatConfig>,
-    enemy_config: Res<EnemyConfig>,
     time: Res<Time>,
 ) {
     for (effect_transform, effect) in effect_query.iter() {
         for (enemy_entity, enemy_transform, mut enemy) in enemy_query.iter_mut() {
             if let Some(damage) = calculate_area_damage(
-                effect.effect_type.damage_per_second(),
+                effect.effect_type.damage_per_second(&game_config.settings),
                 time.delta_secs(),
                 enemy_transform.translation,
                 effect_transform.translation,
-                effect.effect_type.radius(),
+                effect.effect_type.radius(&game_config.settings),
             ) {
                 if !enemy.is_dying {
                     enemy.health.take_damage(damage);
@@ -239,18 +234,18 @@ fn area_effect_damage(
                     // Kill enemy if health depleted
                     if enemy.health.is_dead() && !enemy.is_dying {
                         enemy.is_dying = true;
-                        game_config.score += 10; // 10 points per enemy
+                        game_config.score += game_config.settings.score_per_enemy;
                         commands.entity(enemy_entity).despawn();
                         
                         // Respawn enemy at random position
                         let respawn_pos = generate_respawn_position_unchecked(
                             respawn_counter.count,
-                            enemy_config.spawn_distance_min,
-                            enemy_config.spawn_distance_max,
+                            Distance::new(5.0), // spawn_distance_min
+                            Distance::new(10.5), // spawn_distance_max
                         );
                         respawn_counter.count += 1;
                         
-                        spawn_enemy(&mut commands, &mut meshes, &mut materials, respawn_pos, &enemy_config);
+                        spawn_enemy(&mut commands, &mut meshes, &mut materials, respawn_pos, &game_config);
                     }
                 }
             }

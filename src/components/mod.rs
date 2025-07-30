@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use derive_more::{Add, Mul, Display, From};
 use std::ops::Sub;
+use crate::resources::GameSettings;
 
 // Generic resource pool for health, mana, energy, etc.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Component)]
@@ -249,17 +250,17 @@ pub enum AreaEffectType {
 }
 
 impl AreaEffectType {
-    pub fn damage_per_second(&self) -> Damage {
+    pub fn damage_per_second(&self, settings: &GameSettings) -> Damage {
         match self {
-            AreaEffectType::Magic => Damage::new(150.0),
-            AreaEffectType::Poison => Damage::new(80.0),
+            AreaEffectType::Magic => Damage::new(settings.magic_damage_per_second),
+            AreaEffectType::Poison => Damage::new(settings.poison_damage_per_second),
         }
     }
     
-    pub fn radius(&self) -> Distance {
+    pub fn radius(&self, settings: &GameSettings) -> Distance {
         match self {
-            AreaEffectType::Magic => Distance::new(3.0),
-            AreaEffectType::Poison => Distance::new(4.0),
+            AreaEffectType::Magic => Distance::new(settings.magic_area_radius),
+            AreaEffectType::Poison => Distance::new(settings.poison_area_radius),
         }
     }
     
@@ -380,12 +381,14 @@ mod tests {
 
     #[test]
     fn test_area_effect_types() {
+        let settings = GameSettings::default();
+        
         let magic = AreaEffectType::Magic;
-        assert_eq!(magic.damage_per_second().0, 150.0);
-        assert_eq!(magic.radius().0, 3.0);
+        assert_eq!(magic.damage_per_second(&settings).0, 150.0);
+        assert_eq!(magic.radius(&settings).0, 3.0);
         
         let poison = AreaEffectType::Poison;
-        assert_eq!(poison.damage_per_second().0, 80.0);
-        assert_eq!(poison.radius().0, 4.0);
+        assert_eq!(poison.damage_per_second(&settings).0, 80.0);
+        assert_eq!(poison.radius(&settings).0, 4.0);
     }
 }

@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy::prelude::Camera3d;
 use crate::components::*;
-use crate::resources::GameState;
+use crate::resources::{GameState, GameConfig};
 
 pub struct PlayerPlugin;
 
@@ -18,6 +18,7 @@ fn spawn_player(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    game_config: Res<GameConfig>,
 ) {
     // Player character (simple capsule)
     commands.spawn((
@@ -29,10 +30,10 @@ fn spawn_player(
         Transform::from_xyz(0.0, 1.0, 0.0),
         Player {
             move_target: None,
-            speed: Speed::new(5.0),
-            health: HealthPool::new_full(100.0),
-            mana: ManaPool::new_full(50.0),
-            energy: EnergyPool::new_full(100.0),
+            speed: Speed::new(game_config.settings.player_movement_speed),
+            health: HealthPool::new_full(game_config.settings.player_max_health),
+            mana: ManaPool::new_full(game_config.settings.player_max_mana),
+            energy: EnergyPool::new_full(game_config.settings.player_max_energy),
         },
     ));
 }

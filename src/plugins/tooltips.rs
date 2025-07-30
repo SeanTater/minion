@@ -11,7 +11,8 @@ impl Plugin for TooltipPlugin {
             position_tooltips,
             update_tooltip_resources,
             cleanup_dead_enemy_tooltips,
-        ).run_if(in_state(GameState::Playing)));
+        ).run_if(in_state(GameState::Playing)))
+        .add_systems(OnExit(GameState::Playing), cleanup_all_tooltips);
     }
 }
 
@@ -181,5 +182,15 @@ fn cleanup_dead_enemy_tooltips(
             // Enemy entity doesn't exist anymore
             commands.entity(tooltip_entity).despawn();
         }
+    }
+}
+
+fn cleanup_all_tooltips(
+    mut commands: Commands,
+    tooltip_query: Query<Entity, With<EnemyTooltip>>,
+) {
+    // Remove all tooltips when exiting the Playing state
+    for tooltip_entity in tooltip_query.iter() {
+        commands.entity(tooltip_entity).despawn();
     }
 }
