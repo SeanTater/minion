@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy::app::AppExit;
-use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
 use crate::resources::{GameConfig, GameState, GameSettings};
 use crate::config::save_config;
 
@@ -10,7 +10,14 @@ impl Plugin for EguiUiPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(EguiPlugin::default())
             .add_systems(Startup, setup_ui_camera)
-            .add_systems(Update, simple_test_egui_system);
+            .add_systems(
+                EguiPrimaryContextPass,
+                (
+                    main_menu_egui_system.run_if(in_state(GameState::MainMenu)),
+                    settings_egui_system.run_if(in_state(GameState::Settings)),
+                    handle_exit_events,
+                )
+            );
     }
 }
 
@@ -25,66 +32,123 @@ fn setup_ui_camera(mut commands: Commands) {
     ));
 }
 
-fn handle_exit_events(keys: Res<ButtonInput<KeyCode>>, mut exit: EventWriter<AppExit>) {
+fn handle_exit_events(
+    keys: Res<ButtonInput<KeyCode>>, 
+    mut exit: EventWriter<AppExit>,
+    mut next_state: ResMut<NextState<GameState>>,
+    current_state: Res<State<GameState>>,
+) {
     if keys.just_pressed(KeyCode::Escape) {
-        exit.write(AppExit::Success);
+        match current_state.get() {
+            GameState::Playing => {
+                // From game, go back to main menu
+                next_state.set(GameState::MainMenu);
+            }
+            GameState::Settings => {
+                // From settings, go back to main menu
+                next_state.set(GameState::MainMenu);
+            }
+            GameState::MainMenu => {
+                // From main menu, exit the game
+                exit.write(AppExit::Success);
+            }
+        }
     }
 }
 
-fn simple_test_egui_system(mut contexts: EguiContexts) {
-    println!("egui system running");
-    if let Ok(ctx) = contexts.ctx_mut() {
-        println!("got context");
-        egui::CentralPanel::default().show(ctx, |ui| {
-            println!("in central panel callback");
-            ui.heading("It works!");
-            ui.label("This is a test egui window");
-            ui.separator();
-            ui.label("If you can see this, egui is working");
-        });
-    }
-}
 
 fn main_menu_egui_system(
     mut contexts: EguiContexts,
-    mut game_config: ResMut<GameConfig>,
+    game_config: Res<GameConfig>,
     mut next_state: ResMut<NextState<GameState>>,
+    mut exit: EventWriter<AppExit>,
 ) {
     if let Ok(ctx) = contexts.ctx_mut() {
-        egui::Window::new("Minion Main Menu")
-            .default_size([400.0, 300.0])
-            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
-            .show(ctx, |ui| {
-        ui.vertical_centered(|ui| {
-            ui.add_space(100.0);
-            
-            // Title
-            ui.heading("MINION");
-            ui.add_space(30.0);
-            
-            // Username input
-            ui.label("Username:");
-            ui.text_edit_singleline(&mut game_config.username);
-            ui.add_space(20.0);
-            
-            // Buttons
-            ui.horizontal(|ui| {
-                if ui.button("Play").clicked() {
-                    if let Err(err) = save_config(&game_config) {
-                        eprintln!("Warning: Failed to save config: {}", err);
-                    }
-                    next_state.set(GameState::Playing);
-                }
-                
-                if ui.button("Settings").clicked() {
-                    next_state.set(GameState::Settings);
-                }
-            });
-            
-                ui.add_space(20.0);
-                ui.label("Press Escape to exit");
-            });
+        // Set a dark theme with larger default fonts
+        ctx.set_visuals(egui::Visuals::dark());
+        
+        // Set larger default font size
+        ctx.style_mut(|style| {
+            style.text_styles.insert(egui::TextStyle::Body, egui::FontId::new(16.0, egui::FontFamily::Proportional));
+            style.text_styles.insert(egui::TextStyle::Button, egui::FontId::new(16.0, egui::FontFamily::Proportional));
+            style.text_styles.insert(egui::TextStyle::Heading, egui::FontId::new(24.0, egui::FontFamily::Proportional));
         });
+        
+        egui::CentralPanel::default()
+            .frame(egui::Frame::new().fill(egui::Color32::from_rgb(20, 20, 30)))
+            .show(ctx, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(80.0);
+                    
+                    // Large dramatic title
+                    ui.add(egui::Label::new(
+                        egui::RichText::new("MINION")
+                            .size(84.0)
+                            .color(egui::Color32::from_rgb(220, 50, 50))
+                            .strong()
+                    ));
+                    
+                    ui.add_space(20.0);
+                    ui.add(egui::Label::new(
+                        egui::RichText::new("Action RPG")
+                            .size(28.0)
+                            .color(egui::Color32::from_rgb(180, 180, 180))
+                            .italics()
+                    ));
+                    
+                    ui.add_space(20.0);
+                    
+                    // Show current username if set
+                    if !game_config.username.is_empty() {
+                        ui.add(egui::Label::new(
+                            egui::RichText::new(format!("Welcome back, {}!", game_config.username))
+                                .size(20.0)
+                                .color(egui::Color32::from_rgb(100, 200, 100))
+                        ));
+                        ui.add_space(40.0);
+                    } else {
+                        ui.add_space(60.0);
+                    }
+                    
+                    // Centered buttons with better styling
+                    ui.vertical_centered(|ui| {
+                        let button_size = [160.0, 50.0];
+                        ui.spacing_mut().item_spacing.y = 15.0;
+                        
+                        if ui.add_sized(
+                            button_size,
+                            egui::Button::new(egui::RichText::new("⚔ PLAY").size(20.0).strong())
+                                .fill(egui::Color32::from_rgb(60, 120, 60))
+                        ).clicked() {
+                            next_state.set(GameState::Playing);
+                        }
+                        
+                        if ui.add_sized(
+                            button_size,
+                            egui::Button::new(egui::RichText::new("⚙ SETTINGS").size(18.0))
+                                .fill(egui::Color32::from_rgb(80, 80, 120))
+                        ).clicked() {
+                            next_state.set(GameState::Settings);
+                        }
+                        
+                        if ui.add_sized(
+                            button_size,
+                            egui::Button::new(egui::RichText::new("🚪 QUIT").size(18.0))
+                                .fill(egui::Color32::from_rgb(120, 60, 60))
+                        ).clicked() {
+                            exit.write(AppExit::Success);
+                        }
+                    });
+                    
+                    ui.add_space(60.0);
+                    ui.add(egui::Label::new(
+                        egui::RichText::new("Press Escape to exit")
+                            .size(16.0)
+                            .color(egui::Color32::from_rgb(120, 120, 120))
+                            .italics()
+                    ));
+                });
+            });
     }
 }
 
@@ -94,94 +158,215 @@ fn settings_egui_system(
     mut next_state: ResMut<NextState<GameState>>,
 ) {
     if let Ok(ctx) = contexts.ctx_mut() {
-        egui::Window::new("Settings")
-            .default_size([600.0, 500.0])
-            .show(ctx, |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.collapsing("Player Settings", |ui| {
-                    ui.add(egui::Slider::new(&mut game_config.settings.player_movement_speed, 1.0..=10.0)
-                        .text("Movement Speed"));
-                    ui.add(egui::Slider::new(&mut game_config.settings.player_max_health, 50.0..=500.0)
-                        .text("Max Health"));
-                    ui.add(egui::Slider::new(&mut game_config.settings.player_max_mana, 25.0..=200.0)
-                        .text("Max Mana"));
-                    ui.add(egui::Slider::new(&mut game_config.settings.player_max_energy, 50.0..=300.0)
-                        .text("Max Energy"));
-                });
-
-                ui.collapsing("Combat Settings", |ui| {
-                    ui.add(egui::Slider::new(&mut game_config.settings.bullet_speed, 5.0..=30.0)
-                        .text("Bullet Speed"));
-                    ui.add(egui::Slider::new(&mut game_config.settings.bullet_damage, 0.5..=10.0)
-                        .text("Bullet Damage"));
-                    ui.add(egui::Slider::new(&mut game_config.settings.bullet_lifetime, 1.0..=10.0)
-                        .text("Bullet Lifetime"));
-                    ui.add(egui::Slider::new(&mut game_config.settings.magic_damage_per_second, 50.0..=300.0)
-                        .text("Magic DPS"));
-                    ui.add(egui::Slider::new(&mut game_config.settings.poison_damage_per_second, 30.0..=150.0)
-                        .text("Poison DPS"));
-                    ui.add(egui::Slider::new(&mut game_config.settings.magic_area_radius, 1.0..=8.0)
-                        .text("Magic Radius"));
-                    ui.add(egui::Slider::new(&mut game_config.settings.poison_area_radius, 1.0..=8.0)
-                        .text("Poison Radius"));
-                });
-
-                ui.collapsing("Enemy Settings", |ui| {
-                    ui.add(egui::Slider::new(&mut game_config.settings.enemy_movement_speed, 1.0..=8.0)
-                        .text("Enemy Speed"));
-                    ui.add(egui::Slider::new(&mut game_config.settings.enemy_max_health, 1.0..=20.0)
-                        .text("Enemy Health"));
-                    ui.add(egui::Slider::new(&mut game_config.settings.enemy_chase_distance, 3.0..=15.0)
-                        .text("Chase Distance"));
-                    ui.add(egui::Slider::new(&mut game_config.settings.score_per_enemy, 1..=50)
-                        .text("Score per Kill"));
-                });
-
-                ui.collapsing("UI Settings", |ui| {
-                    ui.add(egui::Slider::new(&mut game_config.settings.window_width, 800.0..=2560.0)
-                        .text("Window Width"));
-                    ui.add(egui::Slider::new(&mut game_config.settings.window_height, 600.0..=1440.0)
-                        .text("Window Height"));
-                    ui.add(egui::Slider::new(&mut game_config.settings.hud_font_size, 10.0..=24.0)
-                        .text("HUD Font Size"));
-                    ui.add(egui::Slider::new(&mut game_config.settings.tooltip_font_size, 8.0..=16.0)
-                        .text("Tooltip Font Size"));
-                    ui.add(egui::Slider::new(&mut game_config.settings.max_username_length, 5..=50)
-                        .text("Max Username Length"));
-                });
-
-                ui.collapsing("Visual Settings", |ui| {
-                    ui.add(egui::Slider::new(&mut game_config.settings.ambient_light_brightness, 100.0..=1000.0)
-                        .text("Ambient Light"));
-                    
-                    ui.label("Health Bar Color:");
-                    ui.color_edit_button_rgb(&mut game_config.settings.health_bar_color);
-                    
-                    ui.label("Mana Bar Color:");
-                    ui.color_edit_button_rgb(&mut game_config.settings.mana_bar_color);
-                    
-                    ui.label("Energy Bar Color:");
-                    ui.color_edit_button_rgb(&mut game_config.settings.energy_bar_color);
-                });
-
-                ui.separator();
-                
-                ui.horizontal(|ui| {
-                    if ui.button("Apply & Save").clicked() {
-                        if let Err(err) = save_config(&game_config) {
-                            eprintln!("Warning: Failed to save config: {}", err);
-                        }
-                    }
-                    
-                    if ui.button("Reset to Defaults").clicked() {
-                        game_config.settings = GameSettings::default();
-                    }
-                    
-                    if ui.button("Back to Menu").clicked() {
-                        next_state.set(GameState::MainMenu);
-                    }
-                });
-            });
+        // Set larger default fonts for settings too
+        ctx.set_visuals(egui::Visuals::dark());
+        ctx.style_mut(|style| {
+            style.text_styles.insert(egui::TextStyle::Body, egui::FontId::new(16.0, egui::FontFamily::Proportional));
+            style.text_styles.insert(egui::TextStyle::Button, egui::FontId::new(16.0, egui::FontFamily::Proportional));
+            style.text_styles.insert(egui::TextStyle::Heading, egui::FontId::new(24.0, egui::FontFamily::Proportional));
         });
+        
+        egui::CentralPanel::default()
+            .frame(egui::Frame::new().fill(egui::Color32::from_rgb(25, 25, 35)))
+            .show(ctx, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(20.0);
+                    
+                    // Settings title
+                    ui.add(egui::Label::new(
+                        egui::RichText::new("⚙ GAME SETTINGS")
+                            .size(52.0)
+                            .color(egui::Color32::from_rgb(200, 180, 100))
+                            .strong()
+                    ));
+                    
+                    ui.add_space(30.0);
+                });
+                
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        // Use a grid layout for better organization with full width expansion
+                        ui.columns(2, |columns| {
+                            // Left column - force full width
+                            columns[0].allocate_ui_with_layout(
+                                [columns[0].available_width(), columns[0].available_height()].into(),
+                                egui::Layout::top_down(egui::Align::LEFT),
+                                |ui| {
+                                    // Player Settings - default open with username
+                                    egui::CollapsingHeader::new(
+                                        egui::RichText::new("🏃 Player Settings")
+                                            .size(22.0)
+                                            .color(egui::Color32::from_rgb(100, 200, 100))
+                                    )
+                                    .default_open(true)
+                                    .show(ui, |ui| {
+                                        ui.label(egui::RichText::new("Username:").size(18.0));
+                                        ui.add_sized(
+                                            [ui.available_width() - 10.0, 32.0],
+                                            egui::TextEdit::singleline(&mut game_config.username)
+                                                .hint_text("Enter your hero name...")
+                                        );
+                                        ui.add_space(10.0);
+                                        
+                                        ui.add(egui::Slider::new(&mut game_config.settings.player_movement_speed, 1.0..=10.0)
+                                            .text("Movement Speed").suffix(" units/s"));
+                                        ui.add(egui::Slider::new(&mut game_config.settings.player_max_health, 50.0..=500.0)
+                                            .text("Max Health").suffix(" HP"));
+                                        ui.add(egui::Slider::new(&mut game_config.settings.player_max_mana, 25.0..=200.0)
+                                            .text("Max Mana").suffix(" MP"));
+                                        ui.add(egui::Slider::new(&mut game_config.settings.player_max_energy, 50.0..=300.0)
+                                            .text("Max Energy").suffix(" EP"));
+                                    });
+
+                                    ui.add_space(20.0);
+
+                                    // Combat Settings - default open
+                                    egui::CollapsingHeader::new(
+                                        egui::RichText::new("⚔ Combat Settings")
+                                            .size(22.0)
+                                            .color(egui::Color32::from_rgb(200, 100, 100))
+                                    )
+                                    .default_open(true)
+                                    .show(ui, |ui| {
+                                        ui.add(egui::Slider::new(&mut game_config.settings.bullet_speed, 5.0..=30.0)
+                                            .text("Bullet Speed").suffix(" units/s"));
+                                        ui.add(egui::Slider::new(&mut game_config.settings.bullet_damage, 0.5..=10.0)
+                                            .text("Bullet Damage").suffix(" DMG"));
+                                        ui.add(egui::Slider::new(&mut game_config.settings.bullet_lifetime, 1.0..=10.0)
+                                            .text("Bullet Lifetime").suffix(" sec"));
+                                        ui.add(egui::Slider::new(&mut game_config.settings.magic_damage_per_second, 50.0..=300.0)
+                                            .text("Magic DPS").suffix(" DMG/s"));
+                                        ui.add(egui::Slider::new(&mut game_config.settings.poison_damage_per_second, 30.0..=150.0)
+                                            .text("Poison DPS").suffix(" DMG/s"));
+                                        ui.add(egui::Slider::new(&mut game_config.settings.magic_area_radius, 1.0..=8.0)
+                                            .text("Magic Radius").suffix(" units"));
+                                        ui.add(egui::Slider::new(&mut game_config.settings.poison_area_radius, 1.0..=8.0)
+                                            .text("Poison Radius").suffix(" units"));
+                                    });
+                                },
+                            );
+
+                            // Right column - force full width
+                            columns[1].allocate_ui_with_layout(
+                                [columns[1].available_width(), columns[1].available_height()].into(),
+                                egui::Layout::top_down(egui::Align::LEFT),
+                                |ui| {
+                                    // Enemy Settings - default open
+                                    egui::CollapsingHeader::new(
+                                        egui::RichText::new("👹 Enemy Settings")
+                                            .size(22.0)
+                                            .color(egui::Color32::from_rgb(200, 150, 100))
+                                    )
+                                    .default_open(true)
+                                    .show(ui, |ui| {
+                                        ui.add(egui::Slider::new(&mut game_config.settings.enemy_movement_speed, 1.0..=8.0)
+                                            .text("Enemy Speed").suffix(" units/s"));
+                                        ui.add(egui::Slider::new(&mut game_config.settings.enemy_max_health, 1.0..=20.0)
+                                            .text("Enemy Health").suffix(" HP"));
+                                        ui.add(egui::Slider::new(&mut game_config.settings.enemy_chase_distance, 3.0..=15.0)
+                                            .text("Chase Distance").suffix(" units"));
+                                        ui.add(egui::Slider::new(&mut game_config.settings.score_per_enemy, 1..=50)
+                                            .text("Score per Kill").suffix(" pts"));
+                                    });
+
+                                    ui.add_space(20.0);
+
+                                    // UI Settings - default closed
+                                    egui::CollapsingHeader::new(
+                                        egui::RichText::new("🖥 UI Settings")
+                                            .size(22.0)
+                                            .color(egui::Color32::from_rgb(100, 150, 200))
+                                    )
+                                    .default_open(false)
+                                    .show(ui, |ui| {
+                                        ui.add(egui::Slider::new(&mut game_config.settings.window_width, 800.0..=2560.0)
+                                            .text("Window Width").suffix(" px"));
+                                        ui.add(egui::Slider::new(&mut game_config.settings.window_height, 600.0..=1440.0)
+                                            .text("Window Height").suffix(" px"));
+                                        ui.add(egui::Slider::new(&mut game_config.settings.hud_font_size, 10.0..=24.0)
+                                            .text("HUD Font Size").suffix(" px"));
+                                        ui.add(egui::Slider::new(&mut game_config.settings.tooltip_font_size, 8.0..=16.0)
+                                            .text("Tooltip Font Size").suffix(" px"));
+                                        ui.add(egui::Slider::new(&mut game_config.settings.max_username_length, 5..=50)
+                                            .text("Max Username Length").suffix(" chars"));
+                                    });
+
+                                    ui.add_space(20.0);
+
+                                    // Visual Settings - default closed
+                                    egui::CollapsingHeader::new(
+                                        egui::RichText::new("🎨 Visual Settings")
+                                            .size(22.0)
+                                            .color(egui::Color32::from_rgb(200, 100, 200))
+                                    )
+                                    .default_open(false)
+                                    .show(ui, |ui| {
+                                        ui.add(egui::Slider::new(&mut game_config.settings.ambient_light_brightness, 100.0..=1000.0)
+                                            .text("Ambient Light").suffix(" lux"));
+                                        
+                                        ui.separator();
+                                        ui.label(egui::RichText::new("Bar Colors:").size(18.0).strong());
+                                        
+                                        ui.horizontal(|ui| {
+                                            ui.label("Health:");
+                                            ui.color_edit_button_rgb(&mut game_config.settings.health_bar_color);
+                                        });
+                                        
+                                        ui.horizontal(|ui| {
+                                            ui.label("Mana:");
+                                            ui.color_edit_button_rgb(&mut game_config.settings.mana_bar_color);
+                                        });
+                                        
+                                        ui.horizontal(|ui| {
+                                            ui.label("Energy:");
+                                            ui.color_edit_button_rgb(&mut game_config.settings.energy_bar_color);
+                                        });
+                                    });
+                                },
+                            );
+                        });
+
+                        ui.add_space(30.0);
+                        ui.separator();
+                        ui.add_space(20.0);
+                        
+                        // Bottom buttons - centered
+                        ui.vertical_centered(|ui| {
+                            ui.horizontal(|ui| {
+                                let button_size = [160.0, 50.0];
+                                ui.spacing_mut().item_spacing.x = 15.0;
+
+                                if ui.add_sized(
+                                    button_size,
+                                    egui::Button::new(egui::RichText::new("💾 APPLY & SAVE").size(16.0))
+                                        .fill(egui::Color32::from_rgb(60, 120, 60))
+                                ).clicked() {
+                                    if let Err(err) = save_config(&game_config) {
+                                        eprintln!("Warning: Failed to save config: {}", err);
+                                    }
+                                }
+                                
+                                if ui.add_sized(
+                                    button_size,
+                                    egui::Button::new(egui::RichText::new("🔄 RESET").size(16.0))
+                                        .fill(egui::Color32::from_rgb(120, 80, 60))
+                                ).clicked() {
+                                    game_config.settings = GameSettings::default();
+                                }
+                                
+                                if ui.add_sized(
+                                    button_size,
+                                    egui::Button::new(egui::RichText::new("⬅ BACK").size(16.0))
+                                        .fill(egui::Color32::from_rgb(80, 80, 120))
+                                ).clicked() {
+                                    next_state.set(GameState::MainMenu);
+                                }
+                            });
+                        });
+                        
+                        ui.add_space(20.0);
+                    });
+            });
     }
 }
