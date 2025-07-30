@@ -21,18 +21,19 @@ fn spawn_player(
 ) {
     // Player character (simple capsule)
     commands.spawn((
-        PbrBundle {
-            mesh: meshes.add(Capsule3d::new(0.5, 2.0)),
-            material: materials.add(StandardMaterial {
-                base_color: Color::srgb(0.8, 0.2, 0.2),
-                ..default()
-            }),
-            transform: Transform::from_xyz(0.0, 1.0, 0.0),
+        Mesh3d(meshes.add(Capsule3d::new(0.5, 2.0))),
+        MeshMaterial3d(materials.add(StandardMaterial {
+            base_color: Color::srgb(0.8, 0.2, 0.2),
             ..default()
-        },
+        })),
+        Transform::from_xyz(0.0, 1.0, 0.0),
         Player {
             move_target: None,
             speed: 5.0,
+            health: 100,
+            max_health: 100,
+            mana: 50,
+            max_mana: 50,
         },
     ));
 }
@@ -44,11 +45,11 @@ fn handle_player_input(
     camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
 ) {
     if mouse_button.just_pressed(MouseButton::Left) {
-        let window = windows.single();
+        let Ok(window) = windows.single() else { return; };
         if let Some(cursor_pos) = window.cursor_position() {
-            let (camera, camera_transform) = camera_query.single();
+            let Ok((camera, camera_transform)) = camera_query.single() else { return; };
             
-            if let Some(ray) = camera.viewport_to_world(camera_transform, cursor_pos) {
+            if let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_pos) {
                 let ground_y = 0.0;
                 if ray.direction.y < 0.0 {
                     let t = (ground_y - ray.origin.y) / ray.direction.y;
@@ -73,7 +74,7 @@ fn move_player(
             let distance = transform.translation.distance(target);
             
             if distance > 0.1 {
-                transform.translation += direction * player.speed * time.delta_seconds();
+                transform.translation += direction * player.speed * time.delta_secs();
                 
                 // Face movement direction
                 if direction.length() > 0.1 {

@@ -29,21 +29,19 @@ fn spawn_enemies(
 
     for pos in spawn_positions {
         commands.spawn((
-            PbrBundle {
-                mesh: meshes.add(Sphere::new(0.5)),
-                material: materials.add(StandardMaterial {
-                    base_color: Color::srgb(0.8, 0.1, 0.1),
-                    ..default()
-                }),
-                transform: Transform::from_translation(pos),
+            Mesh3d(meshes.add(Sphere::new(0.5))),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::srgb(0.8, 0.1, 0.1),
                 ..default()
-            },
+            })),
+            Transform::from_translation(pos),
             Enemy {
                 speed: enemy_config.speed,
                 health: enemy_config.health,
                 chase_distance: enemy_config.chase_distance,
                 is_dying: false,
             },
+            Name(generate_dark_name()),
         ));
     }
 }
@@ -53,7 +51,7 @@ fn enemy_ai(
     player_query: Query<&Transform, (With<Player>, Without<Enemy>)>,
     time: Res<Time>,
 ) {
-    if let Ok(player_transform) = player_query.get_single() {
+    if let Ok(player_transform) = player_query.single() {
         for (mut enemy_transform, enemy) in enemy_query.iter_mut() {
             if enemy.is_dying {
                 continue; // Skip dying enemies
@@ -66,7 +64,7 @@ fn enemy_ai(
             if distance <= enemy.chase_distance && distance > 1.0 {
                 let direction =
                     (player_transform.translation - enemy_transform.translation).normalize();
-                enemy_transform.translation += direction * enemy.speed * time.delta_seconds();
+                enemy_transform.translation += direction * enemy.speed * time.delta_secs();
                 enemy_transform.look_to(direction, Vec3::Y);
             }
         }
