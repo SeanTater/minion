@@ -175,6 +175,9 @@ pub struct Player {
 pub struct Ground;
 
 #[derive(Component)]
+pub struct SceneLight;
+
+#[derive(Component)]
 pub struct CameraFollow {
     pub offset: Vec3,
 }
@@ -264,10 +267,10 @@ impl AreaEffectType {
         }
     }
     
-    pub fn duration(&self) -> f32 {
+    pub fn duration(&self, settings: &GameSettings) -> f32 {
         match self {
-            AreaEffectType::Magic => 2.0,
-            AreaEffectType::Poison => 4.0,
+            AreaEffectType::Magic => settings.magic_area_duration,
+            AreaEffectType::Poison => settings.poison_area_duration,
         }
     }
     
@@ -386,9 +389,11 @@ mod tests {
         let magic = AreaEffectType::Magic;
         assert_eq!(magic.damage_per_second(&settings).0, 150.0);
         assert_eq!(magic.radius(&settings).0, 3.0);
+        assert_eq!(magic.duration(&settings), 2.0);
         
         let poison = AreaEffectType::Poison;
         assert_eq!(poison.damage_per_second(&settings).0, 80.0);
         assert_eq!(poison.radius(&settings).0, 4.0);
+        assert_eq!(poison.duration(&settings), 4.0);
     }
 }

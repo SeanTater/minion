@@ -16,46 +16,56 @@ fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    camera_query: Query<&Camera3d>,
+    ground_query: Query<&Ground>,
+    light_query: Query<&SceneLight>,
 ) {
-    // Ground plane
-    commands.spawn((
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(20.0, 20.0))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(0.3, 0.5, 0.3),
-            ..default()
-        })),
-        Ground,
-    ));
+    // Only spawn ground if it doesn't exist
+    if ground_query.is_empty() {
+        commands.spawn((
+            Mesh3d(meshes.add(Plane3d::default().mesh().size(20.0, 20.0))),
+            MeshMaterial3d(materials.add(StandardMaterial {
+                base_color: Color::srgb(0.3, 0.5, 0.3),
+                ..default()
+            })),
+            Ground,
+        ));
+    }
 
-    // Light
-    commands.spawn((
-        DirectionalLight {
-            shadows_enabled: true,
-            ..default()
-        },
-        Transform {
-            translation: Vec3::new(0.0, 2.0, 0.0),
-            rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_4),
-            ..default()
-        },
-    ));
+    // Only spawn light if it doesn't exist
+    if light_query.is_empty() {
+        commands.spawn((
+            DirectionalLight {
+                shadows_enabled: true,
+                ..default()
+            },
+            Transform {
+                translation: Vec3::new(0.0, 2.0, 0.0),
+                rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_4),
+                ..default()
+            },
+            SceneLight,
+        ));
 
-    // Ambient light
-    commands.insert_resource(AmbientLight {
-        color: Color::WHITE,
-        brightness: 300.0,
-        affects_lightmapped_meshes: false,
-    });
+        // Ambient light (resource - only set once)
+        commands.insert_resource(AmbientLight {
+            color: Color::WHITE,
+            brightness: 300.0,
+            affects_lightmapped_meshes: false,
+        });
+    }
 
-    // Camera with isometric view that follows player
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(10.0, 15.0, 10.0)
-            .looking_at(Vec3::ZERO, Vec3::Y),
-        CameraFollow {
-            offset: Vec3::new(10.0, 15.0, 10.0),
-        },
-    ));
+    // Only spawn camera if it doesn't exist
+    if camera_query.is_empty() {
+        commands.spawn((
+            Camera3d::default(),
+            Transform::from_xyz(10.0, 15.0, 10.0)
+                .looking_at(Vec3::ZERO, Vec3::Y),
+            CameraFollow {
+                offset: Vec3::new(10.0, 15.0, 10.0),
+            },
+        ));
+    }
 }
 
 fn follow_camera(

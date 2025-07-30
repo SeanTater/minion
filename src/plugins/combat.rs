@@ -19,7 +19,8 @@ impl Plugin for CombatPlugin {
                 update_area_effects,
                 bullet_enemy_collision,
                 area_effect_damage,
-            ).run_if(in_state(GameState::Playing)));
+            ).run_if(in_state(GameState::Playing)))
+            .add_systems(OnExit(GameState::Playing), cleanup_combat_entities);
     }
 }
 
@@ -40,8 +41,8 @@ fn spawn_enemy(
         Enemy {
             speed: Speed::new(game_config.settings.enemy_movement_speed),
             health: HealthPool::new_full(game_config.settings.enemy_max_health),
-            mana: ManaPool::new_full(25.0),
-            energy: EnergyPool::new_full(50.0),
+            mana: ManaPool::new_full(game_config.settings.enemy_max_mana),
+            energy: EnergyPool::new_full(game_config.settings.enemy_max_energy),
             chase_distance: Distance::new(game_config.settings.enemy_chase_distance),
             is_dying: false,
         },
@@ -148,13 +149,14 @@ fn update_bullets(
 fn update_area_effects(
     mut commands: Commands,
     mut effect_query: Query<(Entity, &mut AreaEffect, &mut Transform)>,
+    game_config: Res<GameConfig>,
     time: Res<Time>,
 ) {
     for (entity, mut effect, mut transform) in effect_query.iter_mut() {
         effect.elapsed += time.delta_secs();
         
         // Fade effect over time
-        let duration = effect.effect_type.duration();
+        let duration = effect.effect_type.duration(&game_config.settings);
         let alpha = 1.0 - (effect.elapsed / duration);
         transform.scale = Vec3::splat(alpha.max(0.1));
         
@@ -179,7 +181,7 @@ fn bullet_enemy_collision(
             if check_collision(
                 bullet_transform.translation,
                 enemy_transform.translation,
-                Distance::new(0.6), // collision distance
+                Distance::new(game_config.settings.bullet_collision_distance),
             ) {
                 // Damage enemy
                 enemy.health.take_damage(bullet.damage);
@@ -196,8 +198,8 @@ fn bullet_enemy_collision(
                     // Respawn enemy at random position
                     let respawn_pos = generate_respawn_position_unchecked(
                         respawn_counter.count,
-                        Distance::new(5.0), // spawn_distance_min
-                        Distance::new(10.5), // spawn_distance_max
+                        Distance::new(game_config.settings.enemy_spawn_distance_min),
+                        Distance::new(game_config.settings.enemy_spawn_distance_max),
                     );
                     respawn_counter.count += 1;
                     
@@ -250,5 +252,21 @@ fn area_effect_damage(
                 }
             }
         }
+    }
+}
+
+fn cleanup_combat_entities(
+    mut commands: Commands,
+    bullet_query: Query<Entity, With<Bullet>>,
+    area_effect_query: Query<Entity, With<AreaEffect>>,
+) {
+    // Clean up bullets
+    for entity in bullet_query.iter() {
+        commands.entity(entity).despawn();
+    }
+    
+    // Clean up area effects
+    for entity in area_effect_query.iter() {
+        commands.entity(entity).despawn();
     }
 }

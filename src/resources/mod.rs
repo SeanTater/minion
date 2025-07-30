@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use crate::components::AreaEffectType;
 use serde::{Deserialize, Serialize};
+use validator::Validate;
 
 
 #[derive(Resource)]
@@ -39,27 +40,57 @@ impl Default for GameConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Validate)]
 pub struct GameSettings {
     // Player settings
+    #[validate(range(min = 0.1, max = 50.0))]
     pub player_movement_speed: f32,
+    #[validate(range(min = 1.0, max = 1000.0))]
     pub player_max_health: f32,
+    #[validate(range(min = 1.0, max = 500.0))]
     pub player_max_mana: f32,
+    #[validate(range(min = 1.0, max = 500.0))]
     pub player_max_energy: f32,
     
     // Combat settings
+    #[validate(range(min = 1.0, max = 100.0))]
     pub bullet_speed: f32,
+    #[validate(range(min = 0.1, max = 50.0))]
     pub bullet_damage: f32,
+    #[validate(range(min = 0.5, max = 10.0))]
     pub bullet_lifetime: f32,
+    #[validate(range(min = 1.0, max = 1000.0))]
     pub magic_damage_per_second: f32,
+    #[validate(range(min = 1.0, max = 1000.0))]
     pub poison_damage_per_second: f32,
+    #[validate(range(min = 0.5, max = 20.0))]
     pub magic_area_radius: f32,
+    #[validate(range(min = 0.5, max = 20.0))]
     pub poison_area_radius: f32,
+    #[validate(range(min = 0.1, max = 30.0))]
+    pub magic_area_duration: f32,
+    #[validate(range(min = 0.1, max = 30.0))]
+    pub poison_area_duration: f32,
     
     // Enemy settings
+    #[validate(range(min = 0.1, max = 20.0))]
     pub enemy_movement_speed: f32,
+    #[validate(range(min = 0.1, max = 100.0))]
     pub enemy_max_health: f32,
+    #[validate(range(min = 1.0, max = 200.0))]
+    pub enemy_max_mana: f32,
+    #[validate(range(min = 1.0, max = 200.0))]
+    pub enemy_max_energy: f32,
+    #[validate(range(min = 1.0, max = 50.0))]
     pub enemy_chase_distance: f32,
+    #[validate(range(min = 0.1, max = 5.0))]
+    pub enemy_collision_distance: f32,
+    #[validate(range(min = 1.0, max = 20.0))]
+    pub enemy_spawn_distance_min: f32,
+    #[validate(range(min = 5.0, max = 50.0))]
+    pub enemy_spawn_distance_max: f32,
+    #[validate(range(min = 0.1, max = 5.0))]
+    pub bullet_collision_distance: f32,
     pub score_per_enemy: u32,
     
     // UI settings
@@ -93,11 +124,19 @@ impl Default for GameSettings {
             poison_damage_per_second: 80.0,
             magic_area_radius: 3.0,
             poison_area_radius: 4.0,
+            magic_area_duration: 2.0,
+            poison_area_duration: 4.0,
             
             // Enemy settings
             enemy_movement_speed: 3.0,
             enemy_max_health: 3.0,
+            enemy_max_mana: 25.0,
+            enemy_max_energy: 50.0,
             enemy_chase_distance: 8.0,
+            enemy_collision_distance: 1.2,
+            enemy_spawn_distance_min: 5.0,
+            enemy_spawn_distance_max: 10.5,
+            bullet_collision_distance: 0.6,
             score_per_enemy: 10,
             
             // UI settings
