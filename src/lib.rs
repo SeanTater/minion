@@ -1,4 +1,5 @@
 pub mod components;
+pub mod config;
 pub mod game_logic;
 pub mod plugins;
 pub mod resources;

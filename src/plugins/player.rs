@@ -1,14 +1,16 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
+use bevy::prelude::Camera3d;
 use crate::components::*;
+use crate::resources::GameState;
 
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app
-            .add_systems(Startup, spawn_player)
-            .add_systems(Update, (handle_player_input, move_player));
+            .add_systems(OnEnter(GameState::Playing), spawn_player)
+            .add_systems(Update, (handle_player_input, move_player).run_if(in_state(GameState::Playing)));
     }
 }
 
@@ -39,7 +41,7 @@ fn handle_player_input(
     mut player_query: Query<&mut Player>,
     mouse_button: Res<ButtonInput<MouseButton>>,
     windows: Query<&Window, With<PrimaryWindow>>,
-    camera_query: Query<(&Camera, &GlobalTransform)>,
+    camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
 ) {
     if mouse_button.just_pressed(MouseButton::Left) {
         let window = windows.single();

@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use crate::components::AreaEffectType;
+use serde::{Deserialize, Serialize};
 
 #[derive(Resource)]
 pub struct ObjectPool<T: Component> {
@@ -74,4 +75,26 @@ impl Default for SelectedAreaEffect {
             effect_type: AreaEffectType::Magic,
         }
     }
+}
+
+#[derive(Resource, Serialize, Deserialize, Clone, Debug)]
+pub struct GameConfig {
+    pub username: String,
+    pub score: u32,
+}
+
+impl Default for GameConfig {
+    fn default() -> Self {
+        Self {
+            username: String::new(),
+            score: 0,
+        }
+    }
+}
+
+#[derive(States, Default, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum GameState {
+    #[default]
+    MainMenu,
+    Playing,
 }

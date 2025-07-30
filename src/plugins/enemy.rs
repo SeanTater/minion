@@ -8,8 +8,8 @@ impl Plugin for EnemyPlugin {
         app.init_resource::<EnemyConfig>()
             .init_resource::<ObjectPool<Enemy>>()
             .insert_resource(RespawnCounter { count: 0 })
-            .add_systems(Startup, spawn_enemies)
-            .add_systems(Update, (enemy_ai, enemy_collision));
+            .add_systems(OnEnter(GameState::Playing), spawn_enemies)
+            .add_systems(Update, (enemy_ai, enemy_collision).run_if(in_state(GameState::Playing)));
     }
 }
 
