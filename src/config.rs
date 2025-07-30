@@ -1,39 +1,21 @@
 use crate::resources::GameConfig;
+use crate::game_logic::{MinionError, MinionResult};
 use std::fs;
 use std::path::PathBuf;
-use thiserror::Error;
 
-#[derive(Error, Debug)]
-pub enum ConfigError {
-    #[error("Failed to get config directory")]
-    ConfigDirNotFound,
-    
-    #[error("Failed to create config directory: {0}")]
-    ConfigDirCreationFailed(#[from] std::io::Error),
-    
-    #[error("Failed to serialize config: {0}")]
-    SerializationFailed(#[from] toml::ser::Error),
-    
-    #[error("Failed to deserialize config: {0}")]
-    DeserializationFailed(#[from] toml::de::Error),
-    
-    #[error("Config file not found at path: {path}")]
-    ConfigFileNotFound { path: PathBuf },
-}
-
-pub fn get_config_path() -> Result<PathBuf, ConfigError> {
-    let mut path = dirs::config_dir().ok_or(ConfigError::ConfigDirNotFound)?;
+pub fn get_config_path() -> MinionResult<PathBuf> {
+    let mut path = dirs::config_dir().ok_or(MinionError::ConfigDirNotFound)?;
     path.push("minion");
     fs::create_dir_all(&path)?;
     path.push("config.toml");
     Ok(path)
 }
 
-pub fn load_config() -> Result<GameConfig, ConfigError> {
+pub fn load_config() -> MinionResult<GameConfig> {
     let config_path = get_config_path()?;
     
     let contents = fs::read_to_string(&config_path)
-        .map_err(|_| ConfigError::ConfigFileNotFound { path: config_path })?;
+        .map_err(|_| MinionError::ConfigFileNotFound { path: config_path })?;
     
     let config = toml::from_str::<GameConfig>(&contents)?;
     Ok(config)
@@ -46,7 +28,7 @@ pub fn load_config_or_default() -> GameConfig {
     })
 }
 
-pub fn save_config(config: &GameConfig) -> Result<(), ConfigError> {
+pub fn save_config(config: &GameConfig) -> MinionResult<()> {
     let config_path = get_config_path()?;
     let contents = toml::to_string_pretty(config)?;
     fs::write(config_path, contents)?;
@@ -60,15 +42,15 @@ mod tests {
 
     #[test]
     fn test_config_error_display() {
-        let err = ConfigError::ConfigDirNotFound;
+        let err = MinionError::ConfigDirNotFound;
         assert_eq!(err.to_string(), "Failed to get config directory");
         
         let io_err = std::io::Error::new(ErrorKind::PermissionDenied, "Permission denied");
-        let err = ConfigError::ConfigDirCreationFailed(io_err);
+        let err = MinionError::ConfigDirCreationFailed(io_err);
         assert!(err.to_string().contains("Failed to create config directory"));
         
         let path = PathBuf::from("/fake/path");
-        let err = ConfigError::ConfigFileNotFound { path: path.clone() };
+        let err = MinionError::ConfigFileNotFound { path: path.clone() };
         assert!(err.to_string().contains("/fake/path"));
     }
 

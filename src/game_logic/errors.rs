@@ -1,50 +1,45 @@
 use thiserror::Error;
 use bevy::prelude::*;
+use std::path::PathBuf;
 
 #[derive(Error, Debug)]
-pub enum GameError {
-    #[error("Entity not found: {entity:?}")]
-    EntityNotFound { entity: Entity },
+pub enum MinionError {
+    // Config-related errors
+    #[error("Failed to get config directory")]
+    ConfigDirNotFound,
     
-    #[error("Component missing from entity {entity:?}: {component}")]
-    ComponentMissing { entity: Entity, component: &'static str },
+    #[error("Failed to create config directory: {0}")]
+    ConfigDirCreationFailed(#[from] std::io::Error),
     
+    #[error("Failed to serialize config: {0}")]
+    SerializationFailed(#[from] toml::ser::Error),
+    
+    #[error("Failed to deserialize config: {0}")]
+    DeserializationFailed(#[from] toml::de::Error),
+    
+    #[error("Config file not found at path: {path}")]
+    ConfigFileNotFound { path: PathBuf },
+    
+    // Game-related errors
     #[error("Invalid spawn position: {position:?}")]
     InvalidSpawnPosition { position: Vec3 },
-    
-    #[error("Resource not available: {resource}")]
-    ResourceUnavailable { resource: &'static str },
-    
-    #[error("Combat system error: {message}")]
-    CombatError { message: String },
-    
-    #[error("Physics calculation failed: {operation}")]
-    PhysicsError { operation: String },
 }
 
-/// Result type alias for game operations
-pub type GameResult<T> = Result<T, GameError>;
+/// Result type alias for all operations
+pub type MinionResult<T> = Result<T, MinionError>;
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_game_error_display() {
-        let entity = Entity::from_raw(42);
-        let err = GameError::EntityNotFound { entity };
-        assert!(err.to_string().contains("Entity not found"));
-        
-        let err = GameError::ComponentMissing { 
-            entity, 
-            component: "Transform" 
-        };
-        assert!(err.to_string().contains("Component missing"));
-        assert!(err.to_string().contains("Transform"));
-        
-        let err = GameError::InvalidSpawnPosition { 
+    fn test_minion_error_display() {
+        let err = MinionError::InvalidSpawnPosition { 
             position: Vec3::new(100.0, 0.0, 100.0) 
         };
         assert!(err.to_string().contains("Invalid spawn position"));
+        
+        let err = MinionError::ConfigDirNotFound;
+        assert_eq!(err.to_string(), "Failed to get config directory");
     }
 }

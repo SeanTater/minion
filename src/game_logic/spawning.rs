@@ -1,13 +1,13 @@
 use bevy::prelude::*;
 use crate::components::Distance;
-use crate::game_logic::errors::{GameError, GameResult};
+use crate::game_logic::errors::{MinionError, MinionResult};
 use std::f32::consts::TAU;
 
 /// Generate a random spawn position in a ring around the origin
 /// Uses a counter for deterministic positioning that spreads enemies around
-pub fn generate_respawn_position(counter: u32, min_distance: Distance, max_distance: Distance) -> GameResult<Vec3> {
+pub fn generate_respawn_position(counter: u32, min_distance: Distance, max_distance: Distance) -> MinionResult<Vec3> {
     if min_distance.0 >= max_distance.0 {
-        return Err(GameError::InvalidSpawnPosition { 
+        return Err(MinionError::InvalidSpawnPosition { 
             position: Vec3::ZERO 
         });
     }
@@ -108,11 +108,15 @@ mod tests {
         
         // With 8 positions, we should have decent angular spread
         let mut sorted_angles = angles.clone();
-        sorted_angles.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted_angles.sort_by(|a, b| a.partial_cmp(b).expect("NaN in angle comparison"));
         
         // Check that we don't have all angles clustered together
-        let angle_span = sorted_angles.last().unwrap() - sorted_angles.first().unwrap();
-        assert!(angle_span > 1.0); // Should span more than 1 radian
+        if let (Some(first), Some(last)) = (sorted_angles.first(), sorted_angles.last()) {
+            let angle_span = last - first;
+            assert!(angle_span > 1.0); // Should span more than 1 radian
+        } else {
+            panic!("Expected non-empty angles vector");
+        }
     }
 
     #[test]
