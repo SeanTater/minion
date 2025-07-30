@@ -9,7 +9,7 @@ impl Plugin for TooltipPlugin {
         app.add_systems(Update, (
             update_enemy_tooltips,
             position_tooltips,
-            update_tooltip_health,
+            update_tooltip_resources,
             cleanup_dead_enemy_tooltips,
         ).run_if(in_state(GameState::Playing)));
     }
@@ -21,13 +21,22 @@ pub struct EnemyTooltip {
 }
 
 #[derive(Component)]
-pub struct TooltipHealthBar;
+pub struct TooltipHealthBar {
+    pub enemy_entity: Entity,
+}
+
+#[derive(Component)]
+pub struct TooltipManaBar {
+    pub enemy_entity: Entity,
+}
+
+#[derive(Component)]
+pub struct TooltipEnergyBar {
+    pub enemy_entity: Entity,
+}
 
 #[derive(Component)]
 pub struct TooltipNameText;
-
-#[derive(Component)]
-pub struct TooltipHealthText;
 
 fn update_enemy_tooltips(
     mut commands: Commands,
@@ -47,7 +56,7 @@ fn update_enemy_tooltips(
                 Node {
                     position_type: PositionType::Absolute,
                     width: Val::Px(120.0),
-                    height: Val::Px(40.0),
+                    height: Val::Px(70.0),
                     justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
                     flex_direction: FlexDirection::Column,
@@ -60,16 +69,20 @@ fn update_enemy_tooltips(
                 // Enemy name
                 parent.spawn((
                     Text::new(name.0.clone()),
-                    TextFont { font_size: 12.0, ..default() },
+                    TextFont { font_size: 11.0, ..default() },
                     TextColor(Color::WHITE),
+                    Node {
+                        margin: UiRect::bottom(Val::Px(2.0)),
+                        ..default()
+                    },
                     TooltipNameText,
                 ));
                 
                 // Health bar container
                 parent.spawn(Node {
                     width: Val::Px(100.0),
-                    height: Val::Px(8.0),
-                    margin: UiRect::top(Val::Px(2.0)),
+                    height: Val::Px(6.0),
+                    margin: UiRect::vertical(Val::Px(1.0)),
                     ..default()
                 }).with_children(|health_container| {
                     // Health bar background
@@ -90,7 +103,65 @@ fn update_enemy_tooltips(
                             ..default()
                         },
                         BackgroundColor(Color::srgb(0.8, 0.2, 0.2)),
-                        TooltipHealthBar,
+                        TooltipHealthBar { enemy_entity },
+                    ));
+                });
+
+                // Mana bar container
+                parent.spawn(Node {
+                    width: Val::Px(100.0),
+                    height: Val::Px(6.0),
+                    margin: UiRect::vertical(Val::Px(1.0)),
+                    ..default()
+                }).with_children(|mana_container| {
+                    // Mana bar background
+                    mana_container.spawn((
+                        Node {
+                            width: Val::Percent(100.0),
+                            height: Val::Percent(100.0),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
+                    ));
+                    
+                    // Mana bar fill
+                    mana_container.spawn((
+                        Node {
+                            width: Val::Percent(100.0),
+                            height: Val::Percent(100.0),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.2, 0.2, 0.8)),
+                        TooltipManaBar { enemy_entity },
+                    ));
+                });
+
+                // Energy bar container
+                parent.spawn(Node {
+                    width: Val::Px(100.0),
+                    height: Val::Px(6.0),
+                    margin: UiRect::vertical(Val::Px(1.0)),
+                    ..default()
+                }).with_children(|energy_container| {
+                    // Energy bar background
+                    energy_container.spawn((
+                        Node {
+                            width: Val::Percent(100.0),
+                            height: Val::Percent(100.0),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
+                    ));
+                    
+                    // Energy bar fill
+                    energy_container.spawn((
+                        Node {
+                            width: Val::Percent(100.0),
+                            height: Val::Percent(100.0),
+                            ..default()
+                        },
+                        BackgroundColor(Color::srgb(0.8, 0.8, 0.2)),
+                        TooltipEnergyBar { enemy_entity },
                     ));
                 });
             });
@@ -123,7 +194,7 @@ fn position_tooltips(
             if let Ok(screen_pos) = camera.world_to_viewport(camera_transform, world_pos) {
                 // Position tooltip at screen coordinates
                 tooltip_node.left = Val::Px(screen_pos.x - 60.0); // Center horizontally
-                tooltip_node.top = Val::Px(screen_pos.y - 40.0); // Position above enemy
+                tooltip_node.top = Val::Px(screen_pos.y - 70.0); // Position above enemy
             } else {
                 // Hide tooltip if enemy is off-screen
                 tooltip_node.display = Display::None;
@@ -135,20 +206,33 @@ fn position_tooltips(
     }
 }
 
-fn update_tooltip_health(
-    mut tooltip_health_query: Query<&mut Node, With<TooltipHealthBar>>,
-    tooltip_query: Query<(&EnemyTooltip, &Children)>,
+fn update_tooltip_resources(
     enemy_query: Query<&Enemy>,
+    mut health_bar_query: Query<(&mut Node, &TooltipHealthBar), (With<TooltipHealthBar>, Without<TooltipManaBar>, Without<TooltipEnergyBar>)>,
+    mut mana_bar_query: Query<(&mut Node, &TooltipManaBar), (With<TooltipManaBar>, Without<TooltipHealthBar>, Without<TooltipEnergyBar>)>,
+    mut energy_bar_query: Query<(&mut Node, &TooltipEnergyBar), (With<TooltipEnergyBar>, Without<TooltipHealthBar>, Without<TooltipManaBar>)>,
 ) {
-    for (enemy_tooltip, children) in tooltip_query.iter() {
-        if let Ok(enemy) = enemy_query.get(enemy_tooltip.enemy_entity) {
-            // Find the health bar among the children
-            for child in children.iter() {
-                if let Ok(mut health_bar) = tooltip_health_query.get_mut(child) {
-                    let health_percent = enemy.health.percentage();
-                    health_bar.width = Val::Percent(health_percent * 100.0);
-                }
-            }
+    // Update health bars
+    for (mut node, health_bar) in health_bar_query.iter_mut() {
+        if let Ok(enemy) = enemy_query.get(health_bar.enemy_entity) {
+            let health_percent = enemy.health.percentage();
+            node.width = Val::Percent(health_percent * 100.0);
+        }
+    }
+    
+    // Update mana bars
+    for (mut node, mana_bar) in mana_bar_query.iter_mut() {
+        if let Ok(enemy) = enemy_query.get(mana_bar.enemy_entity) {
+            let mana_percent = enemy.mana.percentage();
+            node.width = Val::Percent(mana_percent * 100.0);
+        }
+    }
+    
+    // Update energy bars
+    for (mut node, energy_bar) in energy_bar_query.iter_mut() {
+        if let Ok(enemy) = enemy_query.get(energy_bar.enemy_entity) {
+            let energy_percent = enemy.energy.percentage();
+            node.width = Val::Percent(energy_percent * 100.0);
         }
     }
 }

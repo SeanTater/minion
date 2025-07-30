@@ -32,6 +32,7 @@ fn spawn_player(
             speed: Speed::new(5.0),
             health: HealthPool::new_full(100.0),
             mana: ManaPool::new_full(50.0),
+            energy: EnergyPool::new_full(100.0),
         },
     ));
 }

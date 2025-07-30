@@ -2,18 +2,28 @@ use bevy::prelude::*;
 use derive_more::{Add, Mul, Display, From};
 use std::ops::Sub;
 
-// Compound resource pools that bundle current and max values
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct HealthPool {
+// Generic resource pool for health, mana, energy, etc.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Component)]
+pub struct ResourcePool<T> {
     pub current: f32,
     pub max: f32,
+    _marker: std::marker::PhantomData<T>,
 }
 
+// Resource type markers
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct ManaPool {
-    pub current: f32,
-    pub max: f32,
-}
+pub struct Health;
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct Mana;
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct Energy;
+
+// Type aliases for convenience
+pub type HealthPool = ResourcePool<Health>;
+pub type ManaPool = ResourcePool<Mana>;
+pub type EnergyPool = ResourcePool<Energy>;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Mul, Display, From)]
 pub struct Speed(pub f32);
@@ -24,39 +34,12 @@ pub struct Distance(pub f32);
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Add, Mul, Display, From)]
 pub struct Damage(pub f32);
 
-impl HealthPool {
+impl<T> ResourcePool<T> {
     pub fn new(current: f32, max: f32) -> Self {
         Self {
             current: current.max(0.0).min(max),
             max: max.max(0.0),
-        }
-    }
-    
-    pub fn new_full(max: f32) -> Self {
-        Self::new(max, max)
-    }
-    
-    pub fn is_dead(self) -> bool { self.current <= 0.0 }
-    pub fn is_full(self) -> bool { self.current >= self.max }
-    
-    pub fn take_damage(&mut self, damage: Damage) {
-        self.current = (self.current - damage.0).max(0.0);
-    }
-    
-    pub fn heal(&mut self, amount: f32) {
-        self.current = (self.current + amount).min(self.max);
-    }
-    
-    pub fn percentage(self) -> f32 {
-        if self.max > 0.0 { self.current / self.max } else { 0.0 }
-    }
-}
-
-impl ManaPool {
-    pub fn new(current: f32, max: f32) -> Self {
-        Self {
-            current: current.max(0.0).min(max),
-            max: max.max(0.0),
+            _marker: std::marker::PhantomData,
         }
     }
     
@@ -67,31 +50,60 @@ impl ManaPool {
     pub fn is_empty(self) -> bool { self.current <= 0.0 }
     pub fn is_full(self) -> bool { self.current >= self.max }
     
-    pub fn spend(&mut self, cost: f32) -> bool {
-        if self.current >= cost {
-            self.current -= cost;
-            true
-        } else {
-            false
-        }
+    pub fn percentage(self) -> f32 {
+        if self.max > 0.0 { self.current / self.max } else { 0.0 }
     }
     
     pub fn restore(&mut self, amount: f32) {
         self.current = (self.current + amount).min(self.max);
     }
     
-    pub fn percentage(self) -> f32 {
-        if self.max > 0.0 { self.current / self.max } else { 0.0 }
+    pub fn consume(&mut self, amount: f32) -> bool {
+        if self.current >= amount {
+            self.current = (self.current - amount).max(0.0);
+            true
+        } else {
+            false
+        }
+    }
+    
+    pub fn drain(&mut self, amount: f32) {
+        self.current = (self.current - amount).max(0.0);
     }
 }
 
-impl std::fmt::Display for HealthPool {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:.0}/{:.0}", self.current, self.max)
+// Health-specific methods
+impl ResourcePool<Health> {
+    pub fn is_dead(self) -> bool { self.current <= 0.0 }
+    
+    pub fn take_damage(&mut self, damage: Damage) {
+        self.current = (self.current - damage.0).max(0.0);
+    }
+    
+    pub fn heal(&mut self, amount: f32) {
+        self.restore(amount);
     }
 }
 
-impl std::fmt::Display for ManaPool {
+// Mana-specific methods
+impl ResourcePool<Mana> {
+    pub fn spend(&mut self, cost: f32) -> bool {
+        self.consume(cost)
+    }
+}
+
+// Energy-specific methods
+impl ResourcePool<Energy> {
+    pub fn spend(&mut self, cost: f32) -> bool {
+        self.consume(cost)
+    }
+    
+    pub fn deplete(&mut self, amount: f32) {
+        self.drain(amount);
+    }
+}
+
+impl<T> std::fmt::Display for ResourcePool<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:.0}/{:.0}", self.current, self.max)
     }
@@ -153,6 +165,7 @@ pub struct Player {
     pub speed: Speed,
     pub health: HealthPool,
     pub mana: ManaPool,
+    pub energy: EnergyPool,
 }
 
 #[derive(Component)]
@@ -167,6 +180,8 @@ pub struct CameraFollow {
 pub struct Enemy {
     pub speed: Speed,
     pub health: HealthPool,
+    pub mana: ManaPool,
+    pub energy: EnergyPool,
     pub chase_distance: Distance,
     pub is_dying: bool,
 }
@@ -293,6 +308,29 @@ mod tests {
         
         let positive_speed = Speed::new(10.0);
         assert_eq!(positive_speed.0, 10.0);
+    }
+
+    #[test]
+    fn test_energy_pool_operations() {
+        let mut energy = EnergyPool::new_full(100.0);
+        
+        // Test spend (consume)
+        assert!(energy.spend(25.0));
+        assert_eq!(energy.current, 75.0);
+        assert!(!energy.is_empty());
+        
+        // Test failed spend
+        assert!(!energy.spend(80.0));
+        assert_eq!(energy.current, 75.0);
+        
+        // Test deplete (forced drain)
+        energy.deplete(20.0);
+        assert_eq!(energy.current, 55.0);
+        
+        // Test restore
+        energy.restore(15.0);
+        assert_eq!(energy.current, 70.0);
+        assert_eq!(energy.percentage(), 0.7);
     }
 
     #[test]

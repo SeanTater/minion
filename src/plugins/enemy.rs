@@ -38,6 +38,8 @@ fn spawn_enemies(
             Enemy {
                 speed: enemy_config.speed,
                 health: HealthPool::new_full(enemy_config.max_health),
+                mana: ManaPool::new_full(25.0),
+                energy: EnergyPool::new_full(50.0),
                 chase_distance: enemy_config.chase_distance,
                 is_dying: false,
             },
