@@ -1,0 +1,127 @@
+# Minion Game Configuration
+# This file contains all configurable game settings with explanations.
+# Copy this to ~/.config/minion/config.toml to customize your game.
+
+# Basic game state
+username = ""    # Your username (leave empty for default)
+score = 0        # Current high score
+
+[settings]
+
+# =============================================================================
+# PLAYER SETTINGS
+# =============================================================================
+
+# Basic player stats
+player_movement_speed = 5.0      # Base movement speed (units/second)
+player_max_health = 100.0        # Maximum health points
+player_max_mana = 50.0           # Maximum mana points  
+player_max_energy = 100.0        # Maximum energy points
+
+# Player Physics - These control how the player moves and feels
+player_acceleration_force = 1500.0   # How quickly player accelerates (higher = snappier)
+player_rotation_torque = 1500.0      # How fast player turns (higher = faster rotation)
+player_braking_force = 1000.0        # How hard player brakes when stopping (higher = quicker stops)
+player_stopping_distance = 0.5       # Distance from target before stopping (lower = more precise)
+player_slowdown_distance = 2.0       # Distance to start slowing down (higher = smoother approach)
+
+# =============================================================================
+# ENEMY SETTINGS  
+# =============================================================================
+
+# Basic enemy stats
+enemy_movement_speed = 3.0           # Base enemy movement speed
+enemy_max_health = 3.0               # Enemy health points
+enemy_max_mana = 25.0                # Enemy mana points
+enemy_max_energy = 50.0              # Enemy energy points
+enemy_chase_distance = 8.0           # How far enemies will chase player
+enemy_collision_distance = 1.2       # Distance for enemy-enemy collision detection
+
+# Enemy Physics - These control how enemies move
+enemy_acceleration_force = 200.0     # How quickly enemies accelerate
+enemy_rotation_torque = 150.0        # How fast enemies turn  
+enemy_braking_force = 100.0          # How hard enemies brake
+enemy_stopping_distance = 1.5        # How close enemies get to player before stopping
+enemy_speed_multiplier = 0.8         # Enemy speed relative to player (0.8 = 80% of player speed)
+
+# Level of Detail (LOD) - Automatically switches models based on distance for better performance
+max_lod_level = "medium"             # Maximum detail level for ALL characters: "high", "medium", or "low" (use "medium" for slower hardware)
+enemy_lod_distance_high = 5.0        # Distance to switch from high to medium detail (closer = higher detail)
+enemy_lod_distance_low = 15.0        # Distance to switch from medium to low detail
+
+# Enemy spawning
+enemy_spawn_distance_min = 5.0       # Minimum distance to spawn enemies from player
+enemy_spawn_distance_max = 10.5      # Maximum distance to spawn enemies from player  
+score_per_enemy = 10                 # Points awarded per enemy killed
+
+# =============================================================================
+# COMBAT SETTINGS
+# =============================================================================
+
+# Bullet/Projectile settings
+bullet_speed = 15.0                  # How fast bullets travel
+bullet_damage = 2.0                  # Damage per bullet hit
+bullet_lifetime = 3.0                # How long bullets exist (seconds)
+bullet_collision_distance = 0.6      # Distance for bullet collision detection
+
+# Area Effect Magic
+magic_damage_per_second = 150.0      # Magic area damage per second
+magic_area_radius = 3.0              # Magic area effect radius
+magic_area_duration = 2.0            # How long magic areas last (seconds)
+
+# Area Effect Poison  
+poison_damage_per_second = 80.0      # Poison area damage per second
+poison_area_radius = 4.0             # Poison area effect radius
+poison_area_duration = 4.0           # How long poison areas last (seconds)
+
+# =============================================================================
+# UI SETTINGS
+# =============================================================================
+
+# Window settings
+window_width = 1280.0                # Game window width in pixels
+window_height = 720.0                # Game window height in pixels
+
+# Font settings
+hud_font_size = 16.0                 # HUD text size
+tooltip_font_size = 11.0             # Tooltip text size
+max_username_length = 20             # Maximum characters in username
+
+# =============================================================================
+# VISUAL SETTINGS
+# =============================================================================
+
+# Lighting
+ambient_light_brightness = 300.0     # Overall scene brightness
+
+# UI Colors (RGB values from 0.0 to 1.0)
+health_bar_color = [0.8, 0.2, 0.2]  # Red health bars
+mana_bar_color = [0.2, 0.2, 0.8]    # Blue mana bars  
+energy_bar_color = [0.8, 0.8, 0.2]  # Yellow energy bars
+
+# =============================================================================
+# TUNING TIPS
+# =============================================================================
+
+# Want faster, more responsive movement?
+# - Increase player_acceleration_force (try 1000-3000)
+# - Increase player_rotation_torque (try 1000-3000)
+# - Decrease player_stopping_distance (try 0.2-0.4)
+
+# Want more challenging enemies?  
+# - Increase enemy_speed_multiplier (try 0.9-1.2)
+# - Increase enemy_acceleration_force (try 300-500)
+# - Decrease enemy_stopping_distance (try 0.8-1.2)
+
+# Want smoother, more realistic physics?
+# - Decrease acceleration forces (try 100-200)
+# - Increase stopping distances (try 1.0-2.0)
+# - Increase slowdown distances (try 3.0-5.0)
+
+# Want better performance with high-poly models?
+# - Set max_lod_level = "medium" or "low" to cap maximum detail level for ALL characters
+# - Decrease enemy_lod_distance_high (try 3.0-4.0) to use medium detail sooner
+# - Decrease enemy_lod_distance_low (try 8.0-12.0) to use low detail sooner
+# - Note: You need both player and enemy LOD files:
+#   - players/hooded-high.glb, hooded-med.glb, hooded-low.glb
+#   - enemies/dark-knight-high.glb, dark-knight-med.glb, dark-knight-low.glb

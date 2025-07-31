@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_rapier3d::prelude::*;
 use minion::plugins::*;
 
 fn main() {
@@ -11,6 +12,8 @@ fn main() {
             }),
             ..default()
         }))
+        .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
+        .add_plugins(RapierDebugRenderPlugin::default())
         .add_plugins((
             EguiUiPlugin,
             UiPlugin, // Re-enabled for camera setup
