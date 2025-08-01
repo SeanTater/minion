@@ -24,31 +24,6 @@ impl Plugin for CombatPlugin {
     }
 }
 
-fn spawn_enemy(
-    commands: &mut Commands,
-    meshes: &mut ResMut<Assets<Mesh>>,
-    materials: &mut ResMut<Assets<StandardMaterial>>,
-    position: Vec3,
-    game_config: &GameConfig,
-) {
-    commands.spawn((
-        Mesh3d(meshes.add(Sphere::new(0.5))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(0.8, 0.1, 0.1),
-            ..default()
-        })),
-        Transform::from_translation(position),
-        Enemy {
-            speed: Speed::new(game_config.settings.enemy_movement_speed),
-            health: HealthPool::new_full(game_config.settings.enemy_max_health),
-            mana: ManaPool::new_full(game_config.settings.enemy_max_mana),
-            energy: EnergyPool::new_full(game_config.settings.enemy_max_energy),
-            chase_distance: Distance::new(game_config.settings.enemy_chase_distance),
-            is_dying: false,
-        },
-        Name(generate_dark_name()),
-    ));
-}
 
 fn handle_combat_input(
     mut commands: Commands,
@@ -171,8 +146,7 @@ fn bullet_enemy_collision(
     mut commands: Commands,
     bullet_query: Query<(Entity, &Transform, &Bullet), With<Bullet>>,
     mut enemy_query: Query<(Entity, &Transform, &mut Enemy), (With<Enemy>, Without<Bullet>)>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
     mut respawn_counter: ResMut<RespawnCounter>,
     mut game_config: ResMut<GameConfig>,
 ) {
@@ -203,7 +177,7 @@ fn bullet_enemy_collision(
                     );
                     respawn_counter.count += 1;
                     
-                    spawn_enemy(&mut commands, &mut meshes, &mut materials, respawn_pos, &game_config);
+                    crate::game_logic::spawning::spawn_enemy_entity(&mut commands, &asset_server, respawn_pos, &game_config);
                 }
                 break;
             }
@@ -215,8 +189,7 @@ fn area_effect_damage(
     mut commands: Commands,
     effect_query: Query<(&Transform, &AreaEffect)>,
     mut enemy_query: Query<(Entity, &Transform, &mut Enemy), (With<Enemy>, Without<AreaEffect>)>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
+    asset_server: Res<AssetServer>,
     mut respawn_counter: ResMut<RespawnCounter>,
     mut game_config: ResMut<GameConfig>,
     time: Res<Time>,
@@ -242,12 +215,12 @@ fn area_effect_damage(
                         // Respawn enemy at random position
                         let respawn_pos = generate_respawn_position_unchecked(
                             respawn_counter.count,
-                            Distance::new(5.0), // spawn_distance_min
-                            Distance::new(10.5), // spawn_distance_max
+                            Distance::new(game_config.settings.enemy_spawn_distance_min),
+                            Distance::new(game_config.settings.enemy_spawn_distance_max),
                         );
                         respawn_counter.count += 1;
                         
-                        spawn_enemy(&mut commands, &mut meshes, &mut materials, respawn_pos, &game_config);
+                        crate::game_logic::spawning::spawn_enemy_entity(&mut commands, &asset_server, respawn_pos, &game_config);
                     }
                 }
             }

@@ -203,11 +203,18 @@ pub enum LodLevel {
 }
 
 #[derive(Component)]
-pub struct EnemyLod {
+pub struct LodEntity {
     pub current_level: LodLevel,
     pub high_handle: Handle<Scene>,
     pub med_handle: Handle<Scene>,
     pub low_handle: Handle<Scene>,
+    pub entity_type: LodEntityType,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LodEntityType {
+    Player,
+    Enemy,
 }
 
 // Unified resource display system

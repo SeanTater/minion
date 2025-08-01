@@ -32,10 +32,10 @@ fn spawn_player(
         let low_scene = asset_server.load("players/hooded-low.glb#Scene0");
         
         // Determine starting LOD level based on global max setting
-        let starting_scene = match game_config.settings.max_lod_level.as_str() {
-            "medium" => med_scene,
-            "low" => low_scene,
-            _ => high_scene,
+        let (starting_scene, starting_level) = match game_config.settings.max_lod_level.as_str() {
+            "medium" => (med_scene.clone(), LodLevel::Medium),
+            "low" => (low_scene.clone(), LodLevel::Low),
+            _ => (high_scene.clone(), LodLevel::High),
         };
         
         // Spawn player with 3D model (scaled to 2m tall, rotated to face forward)
@@ -59,6 +59,13 @@ fn spawn_player(
                 health: HealthPool::new_full(game_config.settings.player_max_health),
                 mana: ManaPool::new_full(game_config.settings.player_max_mana),
                 energy: EnergyPool::new_full(game_config.settings.player_max_energy),
+            },
+            LodEntity {
+                current_level: starting_level,
+                high_handle: high_scene.clone(),
+                med_handle: med_scene.clone(),
+                low_handle: low_scene.clone(),
+                entity_type: LodEntityType::Player,
             },
         ));
     }
@@ -99,7 +106,7 @@ fn move_player(
     mut player_query: Query<(&Transform, &mut Player, &mut ExternalForce, &mut Velocity)>,
     game_config: Res<GameConfig>,
 ) {
-    for (transform, mut player, mut ext_force, mut velocity) in player_query.iter_mut() {
+    for (transform, mut player, mut ext_force, velocity) in player_query.iter_mut() {
         if let Some(target) = player.move_target {
             // Only use X and Z for movement calculation (ignore Y differences)
             let player_pos_2d = Vec3::new(transform.translation.x, 0.0, transform.translation.z);

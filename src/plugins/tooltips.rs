@@ -1,6 +1,7 @@
 use bevy::prelude::*;
-use crate::components::{Enemy, Name as EnemyName, ResourceType, ResourceDisplay};
+use crate::components::{Player, Enemy, Name as EnemyName, ResourceType, ResourceDisplay};
 use crate::resources::GameState;
+use crate::plugins::ui_common::update_resource_display;
 
 pub struct TooltipPlugin;
 
@@ -140,30 +141,24 @@ fn spawn_tooltip_resource_bar(
 }
 
 fn update_tooltip_resources(
+    player_query: Query<&Player>, // Added for shared function
     enemy_query: Query<&Enemy>,
     resource_displays: Query<(Entity, &ResourceDisplay), With<ResourceDisplay>>,
     mut bar_fills: Query<&mut Node, (Without<ResourceDisplay>, Without<Text>)>,
+    mut texts: Query<&mut Text, Without<ResourceDisplay>>, // Added for shared function
     children_query: Query<&Children>,
 ) {
-    // Update each resource display
+    // Update each resource display using the shared function
     for (display_entity, display) in resource_displays.iter() {
-        if let Ok(enemy) = enemy_query.get(display.target_entity) {
-            let (current, max) = match display.resource_type {
-                ResourceType::Health => (enemy.health.current, enemy.health.max),
-                ResourceType::Mana => (enemy.mana.current, enemy.mana.max),
-                ResourceType::Energy => (enemy.energy.current, enemy.energy.max),
-            };
-            
-            // Update the bar fill child of this resource display
-            if let Ok(children) = children_query.get(display_entity) {
-                for child_entity in children.iter() {
-                    if let Ok(mut bar_node) = bar_fills.get_mut(child_entity) {
-                        let percentage = if max > 0.0 { current / max } else { 0.0 };
-                        bar_node.width = Val::Percent(percentage * 100.0);
-                    }
-                }
-            }
-        }
+        update_resource_display(
+            display,
+            &player_query,
+            &enemy_query,
+            display_entity,
+            &mut bar_fills,
+            &mut texts,
+            &children_query,
+        );
     }
 }
 

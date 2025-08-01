@@ -1,6 +1,8 @@
 use bevy::prelude::*;
-use crate::components::Distance;
-use crate::game_logic::errors::{MinionError, MinionResult};
+use bevy_rapier3d::prelude::*;
+use crate::components::*;
+use crate::resources::*;
+use crate::game_logic::{errors::{MinionError, MinionResult}, names::generate_dark_name};
 use std::f32::consts::TAU;
 
 /// Generate a random spawn position in a ring around the origin
@@ -46,6 +48,59 @@ pub fn is_valid_spawn_position(
         }
     }
     true
+}
+
+/// Spawn a single enemy entity with all required components
+/// This function eliminates duplication between initial spawning and respawning logic
+pub fn spawn_enemy_entity(
+    commands: &mut Commands,
+    asset_server: &Res<AssetServer>,
+    position: Vec3,
+    game_config: &GameConfig,
+) {
+    // Load all LOD levels for enemies
+    let high_scene = asset_server.load("enemies/dark-knight-high.glb#Scene0");
+    let med_scene = asset_server.load("enemies/dark-knight-med.glb#Scene0");  
+    let low_scene = asset_server.load("enemies/dark-knight-low.glb#Scene0");
+
+    // Determine starting LOD level based on global max setting
+    let (starting_scene, starting_level) = match game_config.settings.max_lod_level.as_str() {
+        "medium" => (med_scene.clone(), LodLevel::Medium),
+        "low" => (low_scene.clone(), LodLevel::Low),
+        _ => (high_scene.clone(), LodLevel::High),
+    };
+
+    commands.spawn((
+        SceneRoot(starting_scene), // Start with appropriate max LOD
+        Transform::from_translation(position)
+            .with_scale(Vec3::splat(2.0))
+            .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
+        RigidBody::Dynamic,
+        Collider::capsule_y(1.0, 0.5), // 2m tall capsule like player
+        LockedAxes::ROTATION_LOCKED_X | LockedAxes::ROTATION_LOCKED_Z, // Prevent tipping over
+        Friction::coefficient(0.7),
+        Restitution::coefficient(0.0), // No bouncing
+        ColliderMassProperties::Density(0.8), // Slightly lighter than player
+        ExternalForce::default(),
+        Velocity::default(),
+        Damping { linear_damping: 3.0, angular_damping: 8.0 }, // Add damping for more realistic movement
+        Enemy {
+            speed: Speed::new(game_config.settings.enemy_movement_speed),
+            health: HealthPool::new_full(game_config.settings.enemy_max_health),
+            mana: ManaPool::new_full(game_config.settings.enemy_max_mana),
+            energy: EnergyPool::new_full(game_config.settings.enemy_max_energy),
+            chase_distance: Distance::new(game_config.settings.enemy_chase_distance),
+            is_dying: false,
+        },
+        LodEntity {
+            current_level: starting_level,
+            high_handle: high_scene.clone(),
+            med_handle: med_scene.clone(),
+            low_handle: low_scene.clone(),
+            entity_type: LodEntityType::Enemy,
+        },
+        Name(generate_dark_name()),
+    ));
 }
 
 #[cfg(test)]
