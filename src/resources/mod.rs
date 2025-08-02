@@ -107,24 +107,12 @@ pub struct GameSettings {
     pub mana_bar_color: [f32; 3],
     pub energy_bar_color: [f32; 3],
     
-    // Physics settings
-    #[validate(range(min = 1.0, max = 10000.0))]
-    pub player_acceleration_force: f32,
-    #[validate(range(min = 1.0, max = 10000.0))]
-    pub player_rotation_torque: f32,
-    #[validate(range(min = 1.0, max = 10000.0))]
-    pub player_braking_force: f32,
+    // Movement settings
     #[validate(range(min = 0.1, max = 2.0))]
     pub player_stopping_distance: f32,
     #[validate(range(min = 0.5, max = 10.0))]
     pub player_slowdown_distance: f32,
     
-    #[validate(range(min = 1.0, max = 10000.0))]
-    pub enemy_acceleration_force: f32,
-    #[validate(range(min = 1.0, max = 10000.0))]
-    pub enemy_rotation_torque: f32,
-    #[validate(range(min = 1.0, max = 10000.0))]
-    pub enemy_braking_force: f32,
     #[validate(range(min = 0.1, max = 5.0))]
     pub enemy_stopping_distance: f32,
     #[validate(range(min = 0.1, max = 1.0))]
@@ -183,16 +171,10 @@ impl Default for GameSettings {
             mana_bar_color: [0.2, 0.2, 0.8],
             energy_bar_color: [0.8, 0.8, 0.2],
             
-            // Physics settings
-            player_acceleration_force: 1500.0,
-            player_rotation_torque: 1500.0,
-            player_braking_force: 1000.0,
+            // Movement settings  
             player_stopping_distance: 0.5,
             player_slowdown_distance: 2.0,
             
-            enemy_acceleration_force: 200.0,
-            enemy_rotation_torque: 150.0,
-            enemy_braking_force: 100.0,
             enemy_stopping_distance: 1.5,
             enemy_speed_multiplier: 0.8,
             

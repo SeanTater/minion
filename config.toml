@@ -18,10 +18,7 @@ player_max_health = 100.0        # Maximum health points
 player_max_mana = 50.0           # Maximum mana points  
 player_max_energy = 100.0        # Maximum energy points
 
-# Player Physics - These control how the player moves and feels
-player_acceleration_force = 1500.0   # How quickly player accelerates (higher = snappier)
-player_rotation_torque = 1500.0      # How fast player turns (higher = faster rotation)
-player_braking_force = 1000.0        # How hard player brakes when stopping (higher = quicker stops)
+# Player Movement - These control how the player moves and feels
 player_stopping_distance = 0.5       # Distance from target before stopping (lower = more precise)
 player_slowdown_distance = 2.0       # Distance to start slowing down (higher = smoother approach)
 
@@ -37,10 +34,7 @@ enemy_max_energy = 50.0              # Enemy energy points
 enemy_chase_distance = 8.0           # How far enemies will chase player
 enemy_collision_distance = 1.2       # Distance for enemy-enemy collision detection
 
-# Enemy Physics - These control how enemies move
-enemy_acceleration_force = 200.0     # How quickly enemies accelerate
-enemy_rotation_torque = 150.0        # How fast enemies turn  
-enemy_braking_force = 100.0          # How hard enemies brake
+# Enemy Movement - These control how enemies move
 enemy_stopping_distance = 1.5        # How close enemies get to player before stopping
 enemy_speed_multiplier = 0.8         # Enemy speed relative to player (0.8 = 80% of player speed)
 
@@ -103,18 +97,14 @@ energy_bar_color = [0.8, 0.8, 0.2]  # Yellow energy bars
 # TUNING TIPS
 # =============================================================================
 
-# Want faster, more responsive movement?
-# - Increase player_acceleration_force (try 1000-3000)
-# - Increase player_rotation_torque (try 1000-3000)
+# Want more responsive movement?
 # - Decrease player_stopping_distance (try 0.2-0.4)
 
 # Want more challenging enemies?  
 # - Increase enemy_speed_multiplier (try 0.9-1.2)
-# - Increase enemy_acceleration_force (try 300-500)
 # - Decrease enemy_stopping_distance (try 0.8-1.2)
 
-# Want smoother, more realistic physics?
-# - Decrease acceleration forces (try 100-200)
+# Want smoother movement?
 # - Increase stopping distances (try 1.0-2.0)
 # - Increase slowdown distances (try 3.0-5.0)
 

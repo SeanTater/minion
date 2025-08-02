@@ -41,18 +41,10 @@ fn spawn_player(
         // Spawn player with 3D model (scaled to 2m tall, rotated to face forward)
         commands.spawn((
             SceneRoot(starting_scene),
-            Transform::from_xyz(0.0, 1.0, 0.0)
-                .with_scale(Vec3::splat(2.0))
-                .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
-            RigidBody::Dynamic,
+            Transform::from_xyz(0.0, 2.0, 0.0)
+                .with_scale(Vec3::splat(2.0)),
+            RigidBody::KinematicPositionBased,
             Collider::capsule_y(1.0, 0.5), // 2m tall capsule (1m radius + 2*0.5m hemispheres), 0.5m radius
-            LockedAxes::ROTATION_LOCKED_X | LockedAxes::ROTATION_LOCKED_Z, // Prevent tipping over
-            Friction::coefficient(0.7),
-            Restitution::coefficient(0.0), // No bouncing
-            ColliderMassProperties::Density(1.0),
-            ExternalForce::default(),
-            Velocity::default(),
-            Damping { linear_damping: 3.0, angular_damping: 8.0 }, // Increased damping for stability
             Player {
                 move_target: None,
                 speed: Speed::new(game_config.settings.player_movement_speed),
@@ -103,10 +95,11 @@ fn handle_player_input(
 }
 
 fn move_player(
-    mut player_query: Query<(&Transform, &mut Player, &mut ExternalForce, &mut Velocity)>,
+    mut player_query: Query<(&mut Transform, &mut Player)>,
     game_config: Res<GameConfig>,
+    time: Res<Time>,
 ) {
-    for (transform, mut player, mut ext_force, velocity) in player_query.iter_mut() {
+    for (mut transform, mut player) in player_query.iter_mut() {
         if let Some(target) = player.move_target {
             // Only use X and Z for movement calculation (ignore Y differences)
             let player_pos_2d = Vec3::new(transform.translation.x, 0.0, transform.translation.z);
@@ -115,55 +108,32 @@ fn move_player(
             let distance = player_pos_2d.distance(target_2d);
 
             if distance > game_config.settings.player_stopping_distance {
-                // Calculate desired velocity toward target
+                // Direct kinematic movement
                 let max_speed = player.speed.0;
-                let desired_velocity = direction * max_speed;
-                
-                // Smoothly blend current velocity toward desired velocity
-                let current_velocity = Vec3::new(velocity.linvel.x, 0.0, velocity.linvel.z);
-                let velocity_diff = desired_velocity - current_velocity;
-                
-                // Apply force to achieve desired velocity, but damped
-                let acceleration_force = velocity_diff * game_config.settings.player_acceleration_force;
-                ext_force.force = Vec3::new(acceleration_force.x, 0.0, acceleration_force.z);
+                let move_distance = max_speed * time.delta_secs();
                 
                 // Slow down as we approach the target
                 let slowdown_factor = (distance / game_config.settings.player_slowdown_distance).min(1.0);
-                ext_force.force *= slowdown_factor;
+                let actual_move_distance = move_distance * slowdown_factor;
                 
-                // Apply torque for rotation toward movement direction
+                // Move toward target, clamped to not overshoot
+                let movement = direction * actual_move_distance.min(distance);
+                transform.translation += movement;
+                
+                // Rotate toward movement direction
+                // NOTE: GLB models are facing backwards, so we flip the direction
                 if direction.length() > 0.1 {
-                    // Calculate target yaw angle - FIXED: add PI/2 to face forward correctly
-                    let target_yaw = direction.z.atan2(direction.x) + std::f32::consts::FRAC_PI_2;
-                    let current_yaw = transform.rotation.to_euler(EulerRot::YXZ).0;
-                    
-                    // Calculate shortest rotation difference
-                    let mut yaw_diff = target_yaw - current_yaw;
-                    
-                    // Normalize to [-π, π] range for shortest rotation
-                    while yaw_diff > std::f32::consts::PI {
-                        yaw_diff -= 2.0 * std::f32::consts::PI;
-                    }
-                    while yaw_diff < -std::f32::consts::PI {
-                        yaw_diff += 2.0 * std::f32::consts::PI;
-                    }
-                    
-                    // Apply torque proportional to the angle difference
-                    ext_force.torque = Vec3::new(0.0, yaw_diff * game_config.settings.player_rotation_torque, 0.0);
+                    let character_pos = transform.translation;
+                    let flat_target = Vec3::new(
+                        character_pos.x - direction.x, // Flip for GLB orientation
+                        character_pos.y, // Keep same Y level
+                        character_pos.z - direction.z  // Flip for GLB orientation
+                    );
+                    transform.look_at(flat_target, Vec3::Y);
                 }
             } else {
                 player.move_target = None;
-                
-                // Actively brake to a stop
-                let current_velocity = Vec3::new(velocity.linvel.x, 0.0, velocity.linvel.z);
-                ext_force.force = -current_velocity * game_config.settings.player_braking_force;
-                ext_force.torque = Vec3::ZERO;
             }
-        } else {
-            // Stop movement when no target - apply braking
-            let current_velocity = Vec3::new(velocity.linvel.x, 0.0, velocity.linvel.z);
-            ext_force.force = -current_velocity * (game_config.settings.player_braking_force * 0.75);
-            ext_force.torque = Vec3::ZERO;
         }
     }
 }
