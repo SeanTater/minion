@@ -1,147 +1,104 @@
 # Minion
 
-A Diablo-like action RPG built with Rust and Bevy 0.16, featuring 3D isometric gameplay, combat systems, and persistent user profiles.
+A Diablo-like action RPG built with Rust and Bevy 0.16, featuring physics-based movement, comprehensive LOD systems, dual UI frameworks, and runtime-configurable gameplay.
 
-## Features
+## Architecture Overview
 
-### Core Gameplay
-- **3D Isometric View**: Classic ARPG camera angle with smooth following
-- **Click-to-Move**: Point and click movement system with ground-plane raycasting
-- **Ranged Combat**: Right-click projectile system with collision detection
-- **Area Effects**: Spacebar-activated spells with multiple effect types (Magic/Poison)
-- **Enemy AI**: Intelligent spawning, pathfinding, and respawning system
+### Dual UI Framework
+- **egui**: Main menu and settings (immediate mode GUI)
+- **Bevy UI**: In-game HUD and tooltips (retained mode)
+- Separate camera systems with coordinated render ordering
 
-### User Experience
-- **Main Menu UI**: Clean username selection interface
-- **User Profiles**: Persistent configuration saved to `~/.config/minion/config.toml`
-- **Score System**: Real-time tracking with persistent high scores
-- **Tooltips**: Interactive UI elements with helpful information
+### Physics-First Movement
+- All entities use Rapier 3D `RigidBody::Dynamic` with force-based movement
+- High damping prevents physics glitches (3.0 linear, 8.0 angular)
+- Capsule colliders with locked rotation axes prevent character tipping
+- Enemy flocking via two-pass separation force system
 
-### Technical Features
-- **PBR Rendering**: Modern lighting with shadows and visual effects
-- **Linux/Wayland Support**: Optimized for Linux desktop environments
-- **Modular Architecture**: Well-organized plugin system for maintainability
-- **Configuration Management**: Automatic config loading/saving with TOML
+### Comprehensive LOD System
+- Global `max_lod_level` setting caps all characters regardless of distance
+- Runtime 3D model switching via `SceneRoot` component hot-swapping
+- Distance-based quality: Player (always high), Enemies (5m/10m/15m thresholds)
+- Preloaded asset handles for instant switching
 
-## Controls
+## Key Features
 
-### Main Menu
-- **Type**: Enter username (alphanumeric and hyphens)
-- **Start Button**: Begin the game
-- **Escape**: Exit application
-
-### In-Game
-- **Left Click**: Move character to target location
-- **Right Click**: Fire projectile toward cursor
-- **Spacebar**: Create area effect at player position
-- **Tab**: Cycle between area effect types
-- **Escape**: Return to main menu
-
-## Combat System
-
-### Projectiles
-- **Damage**: 2 HP per hit
-- **Speed**: 15 units/second
-- **Lifetime**: 3 seconds
-- **Collision**: 0.6 unit radius
-
-### Area Effects
-
-| Type | Color | Radius | DPS | Duration |
-|------|-------|--------|-----|----------|
-| Magic | Blue | 3.0 | 150 | 2s |
-| Poison | Green | 4.0 | 80 | 4s |
-
-### Enemies
-- **Health**: 3 HP
-- **Speed**: 3 units/second
-- **Chase Distance**: 8 units
-- **Spawn Range**: 5-10.5 units from player
-- **Respawn**: Automatic when eliminated
-
-## Scoring
-
-- **10 points** per enemy defeated (projectiles or area effects)
-- Scores automatically saved and persist between sessions
-- High score tracking per user profile
-
-## Architecture
-
-### Project Structure
-```
-src/
-├── components/          # ECS components and shared types
-├── config.rs           # Configuration file handling
-├── game_logic/         # Core game mechanics
-│   ├── damage.rs       # Damage calculation systems
-│   ├── names.rs        # Name generation utilities
-│   └── spawning.rs     # Entity spawning logic
-├── plugins/            # Bevy plugin modules
-│   ├── combat.rs       # Projectile and area effect systems
-│   ├── enemy.rs        # Enemy AI and behavior
-│   ├── player.rs       # Player movement and input
-│   ├── scene.rs        # 3D scene setup and lighting
-│   ├── tooltips.rs     # UI tooltip system
-│   └── ui.rs           # Main menu and HUD
-├── resources/          # Global game resources and state
-├── lib.rs             # Library exports
-└── main.rs            # Application entry point
+### Type-Safe Resource Management
+```rust
+HealthPool, ManaPool, EnergyPool  // Generic pools with phantom types
+// Saturating math operations (no negatives)
+// Type-specific methods: .is_dead(), .spend(), .take_damage()
 ```
 
-### Key Systems
+### Runtime Configuration System
+- TOML config at `~/.config/minion/config.toml` with validation
+- Graceful degradation: invalid values fall back to defaults individually
+- Hot-reload ready for gameplay tuning
+- Comprehensive range constraints on all parameters
 
-#### Input Processing
-1. Mouse raycast to ground plane (y=0)
-2. Movement target set on Player component
-3. Smooth interpolation with 0.1 unit arrival threshold
+### Combat & AI Systems
+- Deterministic ring-based enemy spawning (counter-based angular distribution)
+- Force-based projectile physics rather than transform manipulation
+- Area effect system with duration-based cleanup
+- Two-pass enemy AI: collect positions → apply separation forces
 
-#### Camera System
-- Fixed isometric offset: (10, 15, 10)
-- Always looks at player position
-- Smooth following with consistent framing
+## Critical Implementation Details
 
-#### Combat Flow
-- Projectiles: Click → spawn → physics → collision → damage
-- Area Effects: Spacebar → spawn at player → damage over time → despawn
+### Physics Configuration
+```rust
+// Prevent character tipping over
+LockedAxes::ROTATION_LOCKED_X | LockedAxes::ROTATION_LOCKED_Z
 
-#### Enemy Behavior
-- Spawn randomly around player (5-10.5 unit ring)
-- Chase player when within 8 units
-- Basic collision avoidance
-- Automatic respawning system
+// Mass properties: Player (1.0) vs Enemy (0.8) density
+ColliderMassProperties::Density(1.0)
+
+// High damping prevents oscillation
+Damping { linear_damping: 3.0, angular_damping: 8.0 }
+```
+
+### LOD Asset Pattern
+- **Naming**: `{type}-{level}.glb` (hooded-high.glb, dark-knight-med.glb)
+- **Loading**: `{path}#Scene0` for GLTF scene extraction
+- **Distance**: 2D calculations only (ignore Y axis) for consistency
+- **Switching**: Cheap Handle clones enable instant model swapping
 
 ## Development
 
 ### Requirements
 - Rust 2024 edition
-- ALSA development libraries: `sudo apt-get install libasound2-dev`
+- `sudo apt-get install libasound2-dev` (ALSA for audio)
+- Git LFS for asset management (auto-configured)
 
 ### Commands
 ```bash
-# Run the game
-cargo run
-
-# Development tools
-cargo build --release
-cargo check
-cargo fmt
-cargo clippy
+cargo run              # Launch game (expect 10+ min compile time)
+cargo check            # Fast syntax checking
+cargo clippy           # Linting
+cargo fmt              # Code formatting
 ```
 
-### Configuration Storage
-- **Linux**: `~/.config/minion/config.toml`
-- Contains username and high score
-- Automatically created on first run
+### Asset Management (Git LFS)
+- **Automatic**: All 3D models, textures, audio, fonts tracked via LFS
+- **Workflow**: Add to `assets/` → `git add` → `git commit` → `git push`
+- **New workstation**: `git clone` → `git lfs pull`
 
-## Dependencies
+## Project Structure
+```
+src/
+├── components/         # ECS components with type-safe resource pools
+├── config.rs          # TOML config with validation and graceful fallbacks
+├── game_logic/        # Core mechanics (spawning, damage, names)
+├── plugins/           # Bevy systems (combat, enemy AI, player, UI)
+├── resources/         # Global state and configuration resources
+└── main.rs           # Application entry with dual UI setup
+```
 
-- **bevy**: 0.16 (game engine with Wayland support)
-- **bevy_lunex**: 0.4.1 (UI framework)
-- **serde**: 1.0 (serialization for config)
-- **toml**: 0.8 (config file format)
-- **dirs**: 5.0 (cross-platform config directories)
-- **rand**: 0.8 (random number generation)
+## Testing & Error Handling
+- Comprehensive unit tests for all game logic modules
+- Custom `MinionError` type with `thiserror` integration
+- Result-based APIs with consistent error propagation
+- Graceful degradation in config loading, spawning, and asset loading
 
-## License
+---
 
-See [LICENSE.md](LICENSE.md) for details.
+Built for Rust experts who want to see sophisticated game architecture patterns beyond typical tutorials.

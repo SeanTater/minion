@@ -195,6 +195,28 @@ pub struct Enemy {
 #[derive(Component)]
 pub struct Name(pub String);
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LodLevel {
+    High,   // Original high-poly model
+    Medium, // Medium-poly model  
+    Low,    // Low-poly model
+}
+
+#[derive(Component)]
+pub struct LodEntity {
+    pub current_level: LodLevel,
+    pub high_handle: Handle<Scene>,
+    pub med_handle: Handle<Scene>,
+    pub low_handle: Handle<Scene>,
+    pub entity_type: LodEntityType,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LodEntityType {
+    Player,
+    Enemy,
+}
+
 // Unified resource display system
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ResourceType {

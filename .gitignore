@@ -1,4 +1,4 @@
 /target
 
-# Assets (fonts, textures, etc.)
-assets/
+# Large assets are now tracked with Git LFS
+# assets/ - removed, now using LFS

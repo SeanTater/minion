@@ -1,7 +1,7 @@
 use crate::components::{*, ResourceType, ResourceDisplay};
 use crate::config::load_config_or_default;
 use crate::resources::*;
-use crate::plugins::ui_common::handle_exit_events;
+use crate::plugins::ui_common::{handle_exit_events, update_resource_display};
 use bevy::prelude::*;
 
 pub struct UiPlugin;
@@ -138,12 +138,14 @@ fn spawn_resource_bar(
 
 fn update_hud(
     player_query: Query<(Entity, &Player)>,
+    player_only_query: Query<&Player>, // For shared function
+    enemy_query: Query<&Enemy>, // Added for shared function
     mut resource_displays: Query<(Entity, &mut ResourceDisplay), With<ResourceDisplay>>,
     mut bar_fills: Query<&mut Node, (Without<ResourceDisplay>, Without<Text>)>,
     mut texts: Query<&mut Text, Without<ResourceDisplay>>,
     children_query: Query<&Children>,
 ) {
-    if let Ok((player_entity, player)) = player_query.single() {
+    if let Ok((player_entity, _player)) = player_query.single() {
         // Update resource displays to point to the correct player entity and update their children
         for (display_entity, mut display) in resource_displays.iter_mut() {
             if display.target_entity == Entity::PLACEHOLDER {
@@ -151,27 +153,16 @@ fn update_hud(
             }
             
             if display.target_entity == player_entity {
-                let (current, max) = match display.resource_type {
-                    ResourceType::Health => (player.health.current, player.health.max),
-                    ResourceType::Mana => (player.mana.current, player.mana.max),
-                    ResourceType::Energy => (player.energy.current, player.energy.max),
-                };
-                
-                // Update the bar fill and text children of this resource display
-                if let Ok(children) = children_query.get(display_entity) {
-                    for child_entity in children.iter() {
-                        // Update bar fill (first child)
-                        if let Ok(mut bar_node) = bar_fills.get_mut(child_entity) {
-                            let percentage = if max > 0.0 { current / max } else { 0.0 };
-                            bar_node.width = Val::Percent(percentage * 100.0);
-                        }
-                        
-                        // Update text (second child)
-                        if let Ok(mut text) = texts.get_mut(child_entity) {
-                            **text = format!("{}: {:.0}/{:.0}", display.resource_type.label(), current, max);
-                        }
-                    }
-                }
+                // Use shared resource display update function
+                update_resource_display(
+                    &display,
+                    &player_only_query,
+                    &enemy_query,
+                    display_entity,
+                    &mut bar_fills,
+                    &mut texts,
+                    &children_query,
+                );
             }
         }
     }

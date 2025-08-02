@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_rapier3d::prelude::*;
 use crate::components::*;
 use crate::resources::GameState;
 
@@ -28,6 +29,9 @@ fn setup_scene(
                 base_color: Color::srgb(0.3, 0.5, 0.3),
                 ..default()
             })),
+            Transform::from_xyz(0.0, 0.0, 0.0),
+            RigidBody::Fixed,
+            Collider::cuboid(10.0, 0.1, 10.0), // 20x20 ground plane with small thickness
             Ground,
         ));
     }
@@ -59,10 +63,10 @@ fn setup_scene(
     if camera_query.is_empty() {
         commands.spawn((
             Camera3d::default(),
-            Transform::from_xyz(10.0, 15.0, 10.0)
+            Transform::from_xyz(7.0, 12.0, 7.0)
                 .looking_at(Vec3::ZERO, Vec3::Y),
             CameraFollow {
-                offset: Vec3::new(10.0, 15.0, 10.0),
+                offset: Vec3::new(7.0, 12.0, 7.0),
             },
         ));
     }
