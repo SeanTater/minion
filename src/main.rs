@@ -13,7 +13,6 @@ fn main() {
             ..default()
         }))
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
-        .add_plugins(RapierDebugRenderPlugin::default())
         .add_plugins((
             EguiUiPlugin,
             UiPlugin, // Re-enabled for camera setup

@@ -1,6 +1,5 @@
 use crate::{components::*, resources::*};
 use bevy::prelude::*;
-use bevy_rapier3d::prelude::*;
 
 pub struct EnemyPlugin;
 
@@ -22,11 +21,11 @@ fn spawn_enemies(
     // Only spawn enemies if none exist
     if enemy_query.is_empty() {
         let spawn_positions = [
-            Vec3::new(5.0, 1.0, 5.0),
-            Vec3::new(-5.0, 1.0, 5.0),
-            Vec3::new(5.0, 1.0, -5.0),
-            Vec3::new(-5.0, 1.0, -5.0),
-            Vec3::new(0.0, 1.0, 8.0),
+            Vec3::new(5.0, 2.0, 5.0),
+            Vec3::new(-5.0, 2.0, 5.0),
+            Vec3::new(5.0, 2.0, -5.0),
+            Vec3::new(-5.0, 2.0, -5.0),
+            Vec3::new(0.0, 2.0, 8.0),
         ];
 
         for pos in spawn_positions {
@@ -36,26 +35,25 @@ fn spawn_enemies(
 }
 
 fn enemy_ai(
-    mut enemy_query: Query<(&Transform, &Enemy, &mut ExternalForce, &mut Velocity), (With<Enemy>, Without<Player>)>,
+    mut enemy_query: Query<(&mut Transform, &Enemy), (With<Enemy>, Without<Player>)>,
     player_query: Query<&Transform, (With<Player>, Without<Enemy>)>,
     game_config: Res<GameConfig>,
+    time: Res<Time>,
 ) {
     if let Ok(player_transform) = player_query.single() {
         let player_pos_2d = Vec3::new(player_transform.translation.x, 0.0, player_transform.translation.z);
         
         // First pass: collect all enemy positions for separation calculation
         let enemy_positions: Vec<(Vec3, bool)> = enemy_query.iter()
-            .map(|(transform, enemy, _, _)| {
+            .map(|(transform, enemy)| {
                 let pos = Vec3::new(transform.translation.x, 0.0, transform.translation.z);
                 (pos, enemy.is_dying)
             })
             .collect();
         
-        // Second pass: update each enemy with separation forces
-        for (i, (enemy_transform, enemy, mut ext_force, velocity)) in enemy_query.iter_mut().enumerate() {
+        // Second pass: update each enemy with kinematic movement
+        for (i, (mut enemy_transform, enemy)) in enemy_query.iter_mut().enumerate() {
             if enemy.is_dying {
-                ext_force.force = Vec3::ZERO;
-                ext_force.torque = Vec3::ZERO;
                 continue; // Skip dying enemies
             }
 
@@ -87,35 +85,23 @@ fn enemy_ai(
                 // Blend seek (toward player) with separation (away from other enemies)
                 direction = (direction + separation_force * 0.5).normalize_or_zero();
                 
-                // Velocity-based movement like player
+                // Direct kinematic movement
                 let max_speed = enemy.speed.0 * game_config.settings.enemy_speed_multiplier;
-                let desired_velocity = direction * max_speed;
-                let current_velocity = Vec3::new(velocity.linvel.x, 0.0, velocity.linvel.z);
-                let velocity_diff = desired_velocity - current_velocity;
+                let move_distance = max_speed * time.delta_secs();
+                let movement = direction * move_distance;
+                enemy_transform.translation += movement;
                 
-                // Apply configurable force for movement
-                let acceleration_force = velocity_diff * game_config.settings.enemy_acceleration_force;
-                ext_force.force = Vec3::new(acceleration_force.x, 0.0, acceleration_force.z);
-                
-                // Apply torque for rotation toward player - FIXED: add PI/2 to face forward correctly
-                let target_yaw = direction.z.atan2(direction.x) + std::f32::consts::FRAC_PI_2;
-                let current_yaw = enemy_transform.rotation.to_euler(EulerRot::YXZ).0;
-                let mut yaw_diff = target_yaw - current_yaw;
-                
-                // Normalize rotation difference
-                while yaw_diff > std::f32::consts::PI {
-                    yaw_diff -= 2.0 * std::f32::consts::PI;
+                // Rotate toward player
+                // NOTE: GLB models are facing backwards, so we flip the direction
+                if direction.length() > 0.1 {
+                    let character_pos = enemy_transform.translation;
+                    let flat_target = Vec3::new(
+                        character_pos.x - direction.x, // Flip for GLB orientation
+                        character_pos.y, // Keep same Y level
+                        character_pos.z - direction.z  // Flip for GLB orientation
+                    );
+                    enemy_transform.look_at(flat_target, Vec3::Y);
                 }
-                while yaw_diff < -std::f32::consts::PI {
-                    yaw_diff += 2.0 * std::f32::consts::PI;
-                }
-                
-                ext_force.torque = Vec3::new(0.0, yaw_diff * game_config.settings.enemy_rotation_torque, 0.0);
-            } else {
-                // Apply configurable braking when not chasing
-                let current_velocity = Vec3::new(velocity.linvel.x, 0.0, velocity.linvel.z);
-                ext_force.force = -current_velocity * game_config.settings.enemy_braking_force;
-                ext_force.torque = Vec3::ZERO;
             }
         }
     }

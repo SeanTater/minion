@@ -73,17 +73,9 @@ pub fn spawn_enemy_entity(
     commands.spawn((
         SceneRoot(starting_scene), // Start with appropriate max LOD
         Transform::from_translation(position)
-            .with_scale(Vec3::splat(2.0))
-            .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
-        RigidBody::Dynamic,
+            .with_scale(Vec3::splat(2.0)),
+        RigidBody::KinematicPositionBased,
         Collider::capsule_y(1.0, 0.5), // 2m tall capsule like player
-        LockedAxes::ROTATION_LOCKED_X | LockedAxes::ROTATION_LOCKED_Z, // Prevent tipping over
-        Friction::coefficient(0.7),
-        Restitution::coefficient(0.0), // No bouncing
-        ColliderMassProperties::Density(0.8), // Slightly lighter than player
-        ExternalForce::default(),
-        Velocity::default(),
-        Damping { linear_damping: 3.0, angular_damping: 8.0 }, // Add damping for more realistic movement
         Enemy {
             speed: Speed::new(game_config.settings.enemy_movement_speed),
             health: HealthPool::new_full(game_config.settings.enemy_max_health),
