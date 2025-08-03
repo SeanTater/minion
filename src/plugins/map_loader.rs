@@ -130,7 +130,7 @@ fn create_generated_terrain_map(_game_config: &GameConfig) -> MinionResult<MapDe
             reason: "Failed to get terrain preset".to_string() 
         })?;
     
-    let terrain = terrain_generator.generate(32, 32, 2.0)?;
+    let terrain = terrain_generator.generate(32, 32, 0.5)?;
     
     // Generate spawn zones using terrain analysis
     let spawn_zones = generate_terrain_based_spawn_zones(&terrain)?;

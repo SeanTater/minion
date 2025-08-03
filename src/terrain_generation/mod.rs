@@ -107,7 +107,7 @@ pub fn get_terrain_preset(name: &str, seed: Option<u32>) -> Option<TerrainGenera
             seed,
             TerrainAlgorithm::Perlin {
                 amplitude: 15.0,
-                frequency: 0.1,
+                frequency: 0.01,
                 octaves: 4,
             },
         )),
@@ -115,7 +115,7 @@ pub fn get_terrain_preset(name: &str, seed: Option<u32>) -> Option<TerrainGenera
             seed,
             TerrainAlgorithm::Ridged {
                 amplitude: 20.0,
-                frequency: 0.05,
+                frequency: 0.005,
                 octaves: 5,
             },
         )),
@@ -123,7 +123,7 @@ pub fn get_terrain_preset(name: &str, seed: Option<u32>) -> Option<TerrainGenera
             seed,
             TerrainAlgorithm::Ridged {
                 amplitude: -20.0, // Negative amplitude creates valleys
-                frequency: 0.08,
+                frequency: 0.008,
                 octaves: 4,
             },
         )),

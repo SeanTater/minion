@@ -4,94 +4,13 @@ use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
 use bevy_rapier3d::prelude::*;
 
-/// Coordinate transformation utilities for terrain
-pub mod coordinates {
-    use crate::map::TerrainData;
+pub mod biomes;
+pub mod biome_generator;
+pub mod biome_integration;
+pub mod path_generator;
+pub mod coordinates;
+pub mod constants;
 
-    /// Convert world coordinates to grid coordinates, accounting for terrain centering
-    pub fn world_to_grid(terrain: &TerrainData, world_x: f32, world_z: f32) -> (f32, f32) {
-        let terrain_width = terrain.width as f32 * terrain.scale;
-        let terrain_height = terrain.height as f32 * terrain.scale;
-        let center_x_offset = terrain_width / 2.0;
-        let center_z_offset = terrain_height / 2.0;
-
-        let grid_x = (world_x + center_x_offset) / terrain.scale;
-        let grid_z = (world_z + center_z_offset) / terrain.scale;
-        (grid_x, grid_z)
-    }
-
-    /// Convert grid coordinates to world coordinates, accounting for terrain centering
-    pub fn grid_to_world(terrain: &TerrainData, grid_x: f32, grid_z: f32) -> (f32, f32) {
-        let terrain_width = terrain.width as f32 * terrain.scale;
-        let terrain_height = terrain.height as f32 * terrain.scale;
-        let center_x_offset = terrain_width / 2.0;
-        let center_z_offset = terrain_height / 2.0;
-
-        let world_x = grid_x * terrain.scale - center_x_offset;
-        let world_z = grid_z * terrain.scale - center_z_offset;
-        (world_x, world_z)
-    }
-
-    /// Check if grid coordinates are within terrain bounds
-    pub fn is_valid_grid(terrain: &TerrainData, grid_x: f32, grid_z: f32) -> bool {
-        grid_x >= 0.0 && grid_z >= 0.0 
-            && grid_x < terrain.width as f32 
-            && grid_z < terrain.height as f32
-    }
-
-    /// Get height at exact grid position (no interpolation)
-    pub fn get_height_at_grid(terrain: &TerrainData, x: u32, y: u32) -> Option<f32> {
-        if x >= terrain.width || y >= terrain.height {
-            return None;
-        }
-        let index = (y * terrain.width + x) as usize;
-        terrain.heights.get(index).copied()
-    }
-
-    /// Get interpolated height at world position using bilinear interpolation
-    pub fn get_height_at_world_interpolated(terrain: &TerrainData, world_x: f32, world_z: f32) -> Option<f32> {
-        let (grid_x, grid_z) = world_to_grid(terrain, world_x, world_z);
-
-        // Check bounds (need at least 1 grid cell margin for interpolation)
-        if grid_x < 0.0 || grid_z < 0.0 
-            || grid_x >= (terrain.width - 1) as f32 
-            || grid_z >= (terrain.height - 1) as f32 {
-            return None;
-        }
-
-        // Bilinear interpolation
-        let x0 = grid_x.floor() as u32;
-        let z0 = grid_z.floor() as u32;
-        let x1 = x0 + 1;
-        let z1 = z0 + 1;
-
-        let fx = grid_x.fract();
-        let fz = grid_z.fract();
-
-        let h00 = get_height_at_grid(terrain, x0, z0)?;
-        let h10 = get_height_at_grid(terrain, x1, z0)?;
-        let h01 = get_height_at_grid(terrain, x0, z1)?;
-        let h11 = get_height_at_grid(terrain, x1, z1)?;
-
-        let h0 = h00 * (1.0 - fx) + h10 * fx;
-        let h1 = h01 * (1.0 - fx) + h11 * fx;
-
-        Some(h0 * (1.0 - fz) + h1 * fz)
-    }
-
-    /// Get height at world position using nearest neighbor (faster, less accurate)
-    pub fn get_height_at_world_nearest(terrain: &TerrainData, world_x: f32, world_z: f32) -> Option<f32> {
-        let (grid_x, grid_z) = world_to_grid(terrain, world_x, world_z);
-
-        if !is_valid_grid(terrain, grid_x, grid_z) {
-            return None;
-        }
-
-        let x = grid_x.round() as u32;
-        let z = grid_z.round() as u32;
-        get_height_at_grid(terrain, x, z)
-    }
-}
 
 /// Generate a 3D mesh from heightmap terrain data
 pub fn generate_terrain_mesh(terrain: &TerrainData) -> MinionResult<Mesh> {
@@ -328,9 +247,9 @@ mod tests {
         assert_eq!(grid_z, 1.5);
         
         // Test grid to world transformation  
-        let (world_x, world_z) = grid_to_world(&terrain, 1.5, 1.5);
-        assert_eq!(world_x, 0.0);
-        assert_eq!(world_z, 0.0);
+        let world_coord = grid_to_world(&terrain, 1.5, 1.5);
+        assert_eq!(world_coord.x, 0.0);
+        assert_eq!(world_coord.z, 0.0);
         
         // Test bounds checking
         assert!(is_valid_grid(&terrain, 1.5, 1.5));

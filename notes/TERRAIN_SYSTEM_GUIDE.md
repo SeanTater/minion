@@ -165,7 +165,7 @@ Large terrain sizes show progress feedback and time estimates.
    mapgen --preset rolling --debug-heightmap --verbose
    ```
 
-2. Check generated PNG files in maps/ directory
+2. Check generated PNG files in assets/maps/ directory
 
 3. Verify spawn zone placement makes sense
 
@@ -202,8 +202,8 @@ Large terrain sizes show progress feedback and time estimates.
 - `/src/map/` - Map loading and data structures
 
 ### Generated Files
-- `/maps/*.toml` - Map definition files
-- `/maps/*_heightmap.png` - Debug heightmap images (when --debug-heightmap used)
-- `/maps/*_biomes.png` - Debug biome images (when --debug-biomes used)
+- `/assets/maps/*.bin` - Map definition files
+- `/assets/maps/*_heightmap.png` - Debug heightmap images (when --debug-heightmap used)
+- `/assets/maps/*_biomes.png` - Debug biome images (when --debug-biomes used)
 
 This system provides powerful terrain generation while maintaining the project's focus on simplicity and performance.
