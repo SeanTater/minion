@@ -1,53 +1,23 @@
+use crate::components::*;
+use crate::game_logic::names::generate_dark_name;
+use crate::map::SpawnZone;
+use crate::resources::*;
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
-use crate::components::*;
-use crate::resources::*;
-use crate::game_logic::{errors::{MinionError, MinionResult}, names::generate_dark_name};
 use std::f32::consts::TAU;
 
-/// Generate a random spawn position in a ring around the origin
-/// Uses a counter for deterministic positioning that spreads enemies around
-pub fn generate_respawn_position(counter: u32, min_distance: Distance, max_distance: Distance) -> MinionResult<Vec3> {
-    if min_distance.0 >= max_distance.0 {
-        return Err(MinionError::InvalidSpawnPosition { 
-            position: Vec3::ZERO 
-        });
-    }
-    
+/// Generate a random position within a spawn zone using a counter for deterministic placement
+pub fn generate_zone_position(zone: &SpawnZone, counter: u32) -> Vec3 {
+    // Use counter for deterministic but spread-out positioning within the zone
     let angle = (counter as f32 * 2.3) % TAU; // Use prime-like multiplier for spread
-    let distance = min_distance.0 + (counter % 4) as f32 * (max_distance.0 - min_distance.0) / 4.0;
-    
-    let position = Vec3::new(
-        angle.cos() * distance,
-        1.0, // Keep on ground level
-        angle.sin() * distance,
-    );
-    
-    Ok(position)
-}
+    let distance_factor = (counter % 7) as f32 / 7.0; // Cycle through distances
+    let distance = zone.radius * (0.2 + 0.8 * distance_factor); // Stay within zone bounds
 
-/// Generate a random spawn position in a ring around the origin (fallback version)
-/// Uses a counter for deterministic positioning that spreads enemies around
-pub fn generate_respawn_position_unchecked(counter: u32, min_distance: Distance, max_distance: Distance) -> Vec3 {
-    generate_respawn_position(counter, min_distance, max_distance)
-        .unwrap_or_else(|err| {
-            eprintln!("Warning: Spawn position generation failed ({}), using fallback", err);
-            Vec3::new(5.0, 1.0, 0.0) // Safe fallback position
-        })
-}
-
-/// Check if a position is valid for spawning (not too close to other entities)
-pub fn is_valid_spawn_position(
-    position: Vec3,
-    existing_positions: &[Vec3],
-    min_distance: Distance,
-) -> bool {
-    for &existing_pos in existing_positions {
-        if position.distance(existing_pos) < min_distance.0 {
-            return false;
-        }
-    }
-    true
+    Vec3::new(
+        zone.center.x + angle.cos() * distance,
+        zone.center.y + 1.0, // Spawn slightly above terrain - character controller will handle terrain following
+        zone.center.z + angle.sin() * distance,
+    )
 }
 
 /// Spawn a single enemy entity with all required components
@@ -60,7 +30,7 @@ pub fn spawn_enemy_entity(
 ) {
     // Load all LOD levels for enemies
     let high_scene = asset_server.load("enemies/dark-knight-high.glb#Scene0");
-    let med_scene = asset_server.load("enemies/dark-knight-med.glb#Scene0");  
+    let med_scene = asset_server.load("enemies/dark-knight-med.glb#Scene0");
     let low_scene = asset_server.load("enemies/dark-knight-low.glb#Scene0");
 
     // Determine starting LOD level based on global max setting
@@ -72,10 +42,18 @@ pub fn spawn_enemy_entity(
 
     commands.spawn((
         SceneRoot(starting_scene), // Start with appropriate max LOD
-        Transform::from_translation(position)
-            .with_scale(Vec3::splat(2.0)),
+        Transform::from_translation(position).with_scale(Vec3::splat(2.0)),
         RigidBody::KinematicPositionBased,
         Collider::capsule_y(1.0, 0.5), // 2m tall capsule like player
+        KinematicCharacterController {
+            snap_to_ground: Some(CharacterLength::Absolute(1.5)), // Increased for better slope descent detection
+            offset: CharacterLength::Absolute(0.1), // Small gap for numerical stability
+            max_slope_climb_angle: 45.0_f32.to_radians(),
+            min_slope_slide_angle: 30.0_f32.to_radians(),
+            slide: true, // Enable sliding on slopes
+            apply_impulse_to_dynamic_bodies: true, // Better physics interaction
+            ..default()
+        },
         Enemy {
             speed: Speed::new(game_config.settings.enemy_movement_speed),
             health: HealthPool::new_full(game_config.settings.enemy_max_health),
@@ -100,63 +78,61 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_respawn_position_generation() {
-        let pos1 = generate_respawn_position(0, Distance::new(5.0), Distance::new(10.0)).unwrap();
-        let pos2 = generate_respawn_position(1, Distance::new(5.0), Distance::new(10.0)).unwrap();
-        
+    fn test_zone_position_generation() {
+        let zone = SpawnZone {
+            center: Vec3::new(10.0, 0.0, 10.0),
+            radius: 5.0,
+            max_enemies: 10,
+            enemy_types: vec!["dark-knight".to_string()],
+        };
+
+        let pos1 = generate_zone_position(&zone, 0);
+        let pos2 = generate_zone_position(&zone, 1);
+
         // Positions should be different
         assert_ne!(pos1, pos2);
-        
-        // Should be on ground level
+
+        // Should be at correct height
         assert_eq!(pos1.y, 1.0);
         assert_eq!(pos2.y, 1.0);
-        
-        // Should be within distance range
-        let distance1 = Vec3::new(pos1.x, 0.0, pos1.z).length();
-        let distance2 = Vec3::new(pos2.x, 0.0, pos2.z).length();
-        
-        assert!(distance1 >= 5.0 && distance1 <= 10.0);
-        assert!(distance2 >= 5.0 && distance2 <= 10.0);
+
+        // Should be within zone radius
+        let distance1 = Vec3::new(pos1.x - zone.center.x, 0.0, pos1.z - zone.center.z).length();
+        let distance2 = Vec3::new(pos2.x - zone.center.x, 0.0, pos2.z - zone.center.z).length();
+
+        assert!(distance1 <= zone.radius);
+        assert!(distance2 <= zone.radius);
+
+        // Should maintain minimum distance from center (0.2 factor)
+        assert!(distance1 >= zone.radius * 0.2);
+        assert!(distance2 >= zone.radius * 0.2);
     }
 
     #[test]
-    fn test_spawn_position_validation() {
-        let position = Vec3::new(5.0, 1.0, 0.0);
-        let existing = vec![
-            Vec3::new(0.0, 1.0, 0.0),
-            Vec3::new(10.0, 1.0, 0.0),
-        ];
-        
-        // Should be valid - far enough from existing positions  
-        assert!(is_valid_spawn_position(position, &existing, Distance::new(2.0)));
-        
-        // Should be invalid - too close to first position
-        assert!(!is_valid_spawn_position(position, &existing, Distance::new(6.0)));
-    }
+    fn test_zone_position_spread() {
+        let zone = SpawnZone {
+            center: Vec3::new(0.0, 0.0, 0.0),
+            radius: 10.0,
+            max_enemies: 8,
+            enemy_types: vec!["dark-knight".to_string()],
+        };
 
-    #[test]
-    fn test_counter_spread() {
-        let positions: Vec<Vec3> = (0..8)
-            .map(|i| generate_respawn_position(i, Distance::new(5.0), Distance::new(10.0)).unwrap())
-            .collect();
-        
+        let positions: Vec<Vec3> = (0..8).map(|i| generate_zone_position(&zone, i)).collect();
+
         // All positions should be different
         for i in 0..positions.len() {
             for j in (i + 1)..positions.len() {
                 assert_ne!(positions[i], positions[j]);
             }
         }
-        
+
         // Should provide good spread - check that angles are reasonably distributed
-        let angles: Vec<f32> = positions
-            .iter()
-            .map(|pos| pos.z.atan2(pos.x))
-            .collect();
-        
+        let angles: Vec<f32> = positions.iter().map(|pos| pos.z.atan2(pos.x)).collect();
+
         // With 8 positions, we should have decent angular spread
         let mut sorted_angles = angles.clone();
         sorted_angles.sort_by(|a, b| a.partial_cmp(b).expect("NaN in angle comparison"));
-        
+
         // Check that we don't have all angles clustered together
         if let (Some(first), Some(last)) = (sorted_angles.first(), sorted_angles.last()) {
             let angle_span = last - first;
@@ -164,19 +140,5 @@ mod tests {
         } else {
             panic!("Expected non-empty angles vector");
         }
-    }
-
-    #[test]
-    fn test_invalid_spawn_parameters() {
-        // min_distance >= max_distance should return error
-        let result = generate_respawn_position(0, Distance::new(10.0), Distance::new(5.0));
-        assert!(result.is_err());
-        
-        let result = generate_respawn_position(0, Distance::new(5.0), Distance::new(5.0));
-        assert!(result.is_err());
-        
-        // Fallback function should handle errors gracefully
-        let pos = generate_respawn_position_unchecked(0, Distance::new(10.0), Distance::new(5.0));
-        assert_eq!(pos, Vec3::new(5.0, 1.0, 0.0)); // Fallback position
     }
 }

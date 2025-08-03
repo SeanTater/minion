@@ -16,6 +16,8 @@ fn main() {
         .add_plugins((
             EguiUiPlugin,
             UiPlugin, // Re-enabled for camera setup
+            MapLoaderPlugin,
+            EnvironmentPlugin, // Must come after MapLoaderPlugin to access MapDefinition resource
             ScenePlugin,
             PlayerPlugin,
             EnemyPlugin,

@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use crate::components::{Damage, Distance};
+use bevy::prelude::*;
 
 /// Calculate area effect damage with distance-based falloff
 /// Returns None if target is outside the effect radius
@@ -11,15 +11,15 @@ pub fn calculate_area_damage(
     radius: Distance,
 ) -> Option<Damage> {
     let distance = target_position.distance(effect_position);
-    
+
     if distance > radius.0 {
         return None;
     }
-    
+
     // Distance-based damage falloff
     let damage_multiplier = (1.0 - (distance / radius.0)).max(0.0);
     let damage_float = base_damage_per_second.0 * damage_multiplier * delta_time;
-    
+
     if damage_float > 0.0 {
         Some(Damage::new(damage_float.max(1.0))) // Ensure at least 1 damage if any is dealt
     } else {
@@ -33,20 +33,16 @@ pub fn check_collision(pos1: Vec3, pos2: Vec3, collision_distance: Distance) -> 
 }
 
 /// Calculate pushback force between two entities that are too close
-pub fn calculate_pushback(
-    pos1: Vec3,
-    pos2: Vec3,
-    min_distance: Distance,
-) -> Option<(Vec3, Vec3)> {
+pub fn calculate_pushback(pos1: Vec3, pos2: Vec3, min_distance: Distance) -> Option<(Vec3, Vec3)> {
     let distance = pos1.distance(pos2);
-    
+
     if distance < min_distance.0 && distance > 0.0 {
         let pushback_force = (min_distance.0 - distance) * 0.5;
         let direction = (pos1 - pos2).normalize();
-        
+
         let push1 = direction * pushback_force * 0.5;
         let push2 = -direction * pushback_force * 0.5;
-        
+
         Some((push1, push2))
     } else {
         None
@@ -61,12 +57,12 @@ mod tests {
     fn test_area_damage_direct_hit() {
         let damage = calculate_area_damage(
             Damage::new(100.0), // 100 DPS
-            0.016, // ~60fps delta time
+            0.016,              // ~60fps delta time
             Vec3::ZERO,
             Vec3::ZERO,
             Distance::new(3.0),
         );
-        
+
         assert_eq!(damage, Some(Damage::new(1.6))); // 100 * 1.0 * 0.016 = 1.6
     }
 
@@ -79,7 +75,7 @@ mod tests {
             Vec3::ZERO,
             Distance::new(3.0),
         );
-        
+
         assert_eq!(damage, None); // Should be outside radius
     }
 
@@ -92,7 +88,7 @@ mod tests {
             Vec3::ZERO,
             Distance::new(3.0),
         );
-        
+
         // Distance = 1.5, radius = 3.0
         // Multiplier = 1.0 - (1.5/3.0) = 0.5
         // Damage = 100 * 0.5 * 0.016 = 0.8 -> 1 (minimum)
@@ -108,24 +104,30 @@ mod tests {
             Vec3::ZERO,
             Distance::new(3.0),
         );
-        
+
         assert_eq!(damage, None);
     }
 
     #[test]
     fn test_collision_detection() {
-        assert!(check_collision(Vec3::ZERO, Vec3::new(0.5, 0.0, 0.0), Distance::new(0.6)));
-        assert!(!check_collision(Vec3::ZERO, Vec3::new(1.0, 0.0, 0.0), Distance::new(0.6)));
+        assert!(check_collision(
+            Vec3::ZERO,
+            Vec3::new(0.5, 0.0, 0.0),
+            Distance::new(0.6)
+        ));
+        assert!(!check_collision(
+            Vec3::ZERO,
+            Vec3::new(1.0, 0.0, 0.0),
+            Distance::new(0.6)
+        ));
     }
 
     #[test]
     fn test_pushback_calculation() {
-        let (push1, push2) = calculate_pushback(
-            Vec3::new(1.0, 0.0, 0.0),
-            Vec3::ZERO,
-            Distance::new(1.5),
-        ).unwrap();
-        
+        let (push1, push2) =
+            calculate_pushback(Vec3::new(1.0, 0.0, 0.0), Vec3::ZERO, Distance::new(1.5))
+                .expect("Pushback calculation should succeed with valid inputs");
+
         // Distance = 1.0, min_distance = 1.5
         // Pushback force = (1.5 - 1.0) * 0.5 = 0.25
         // Direction from pos2 to pos1 = (1, 0, 0)
@@ -137,12 +139,8 @@ mod tests {
 
     #[test]
     fn test_no_pushback_when_far_enough() {
-        let result = calculate_pushback(
-            Vec3::new(2.0, 0.0, 0.0),
-            Vec3::ZERO,
-            Distance::new(1.5),
-        );
-        
+        let result = calculate_pushback(Vec3::new(2.0, 0.0, 0.0), Vec3::ZERO, Distance::new(1.5));
+
         assert_eq!(result, None);
     }
 }

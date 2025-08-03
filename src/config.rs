@@ -1,5 +1,5 @@
-use crate::resources::GameConfig;
 use crate::game_logic::{MinionError, MinionResult};
+use crate::resources::GameConfig;
 use std::fs;
 use std::path::PathBuf;
 use validator::Validate;
@@ -14,12 +14,12 @@ pub fn get_config_path() -> MinionResult<PathBuf> {
 
 pub fn load_config() -> MinionResult<GameConfig> {
     let config_path = get_config_path()?;
-    
+
     let contents = fs::read_to_string(&config_path)
         .map_err(|_| MinionError::ConfigFileNotFound { path: config_path })?;
-    
+
     let mut config = toml::from_str::<GameConfig>(&contents)?;
-    
+
     // Validate settings and fall back to defaults for invalid values
     if let Err(validation_errors) = config.settings.validate() {
         eprintln!("Warning: Invalid config values found, using defaults for invalid fields:");
@@ -28,22 +28,24 @@ pub fn load_config() -> MinionResult<GameConfig> {
         }
         config.settings = crate::resources::GameSettings::default();
     }
-    
+
     Ok(config)
 }
 
 pub fn load_config_or_default() -> GameConfig {
     load_config().unwrap_or_else(|err| {
-        eprintln!("Warning: Failed to load config ({}), using defaults", err);
+        eprintln!("Warning: Failed to load config ({err}), using defaults");
         GameConfig::default()
     })
 }
 
 pub fn save_config(config: &GameConfig) -> MinionResult<()> {
     // Validate before saving
-    config.settings.validate()
+    config
+        .settings
+        .validate()
         .map_err(|_| MinionError::InvalidConfig)?;
-    
+
     let config_path = get_config_path()?;
     let contents = toml::to_string_pretty(config)?;
     fs::write(config_path, contents)?;
@@ -59,11 +61,14 @@ mod tests {
     fn test_config_error_display() {
         let err = MinionError::ConfigDirNotFound;
         assert_eq!(err.to_string(), "Failed to get config directory");
-        
+
         let io_err = std::io::Error::new(ErrorKind::PermissionDenied, "Permission denied");
         let err = MinionError::ConfigDirCreationFailed(io_err);
-        assert!(err.to_string().contains("Failed to create config directory"));
-        
+        assert!(
+            err.to_string()
+                .contains("Failed to create config directory")
+        );
+
         let path = PathBuf::from("/fake/path");
         let err = MinionError::ConfigFileNotFound { path: path.clone() };
         assert!(err.to_string().contains("/fake/path"));
@@ -74,10 +79,10 @@ mod tests {
         // Test that load_config_or_default handles errors gracefully
         // This test verifies the function exists and returns a valid GameConfig
         let config = load_config_or_default();
-        
+
         // Should always return a valid config (either loaded or default)
-        assert!(config.score >= 0); // Score should be non-negative
-        
+        // Score is u32, always non-negative by type system
+
         // Username can be empty (default) or non-empty (loaded from file)
         // We don't assert specific values since this may load a real config
     }
