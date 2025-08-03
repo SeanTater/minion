@@ -28,6 +28,17 @@ pub struct MapGenerationConfig {
 pub struct MapGenerator;
 
 impl MapGenerator {
+    /// Correct spawn height to match terrain elevation at that position
+    fn correct_spawn_height(terrain: &TerrainData, spawn_pos: Vec3) -> MinionResult<Vec3> {
+        use minion::terrain::coordinates::get_height_at_world_interpolated;
+        
+        let terrain_height = get_height_at_world_interpolated(terrain, spawn_pos.x, spawn_pos.z)
+            .unwrap_or(0.0);
+        
+        // Spawn 1.0 unit above the terrain
+        Ok(Vec3::new(spawn_pos.x, terrain_height + 1.0, spawn_pos.z))
+    }
+
     pub fn generate(config: MapGenerationConfig) -> MinionResult<MapDefinition> {
         println!("Generating map: {}", config.name);
         println!("Terrain size: {}x{} grid cells", config.width, config.height);
@@ -37,6 +48,10 @@ impl MapGenerator {
         // Generate terrain
         let terrain = config.generator.generate(config.width, config.height, config.terrain_scale)?;
         println!("Generated terrain with {} height points", terrain.heights.len());
+
+        // Fix player spawn height to match terrain elevation
+        let corrected_player_spawn = Self::correct_spawn_height(&terrain, config.player_spawn)?;
+        println!("Corrected player spawn from {} to {}", config.player_spawn, corrected_player_spawn);
 
         // Generate biome data if enabled
         let biome_data = if config.enable_biomes {
@@ -73,9 +88,9 @@ impl MapGenerator {
 
         // Generate spawn zones (biome-aware if biomes enabled)
         let enemy_zones = if let Some(ref biome_data) = biome_data {
-            Self::generate_biome_aware_spawn_zones(&terrain, &biome_data.blend_map, config.player_spawn, 5)?
+            Self::generate_biome_aware_spawn_zones(&terrain, &biome_data.blend_map, corrected_player_spawn, 5)?
         } else {
-            Self::generate_spawn_zones(&terrain, config.player_spawn, 5)?
+            Self::generate_spawn_zones(&terrain, corrected_player_spawn, 5)?
         };
         println!("Generated {} enemy spawn zones", enemy_zones.len());
 
@@ -85,7 +100,7 @@ impl MapGenerator {
             Self::generate_biome_aware_objects(
                 &terrain,
                 &biome_data.blend_map,
-                config.player_spawn,
+                corrected_player_spawn,
                 &enemy_zones,
                 config.object_density,
                 &config.object_types,
@@ -95,7 +110,7 @@ impl MapGenerator {
         } else {
             Self::generate_objects(
                 &terrain,
-                config.player_spawn,
+                corrected_player_spawn,
                 &enemy_zones,
                 config.object_density,
                 &config.object_types,
@@ -107,7 +122,7 @@ impl MapGenerator {
         Ok(MapDefinition::new(
             config.name,
             terrain,
-            config.player_spawn,
+            corrected_player_spawn,
             enemy_zones,
             environment_objects,
         )?)
@@ -302,8 +317,14 @@ impl MapGenerator {
 
             // Use existing spawn zone logic for terrain checks
             if is_suitable_for_spawning(terrain, position.x, position.z, 0.3) {
+                // Get terrain height and spawn 1.0 unit above it
+                let terrain_height = minion::terrain::coordinates::get_height_at_world_nearest(
+                    terrain, position.x, position.z
+                ).unwrap_or(0.0);
+                let corrected_position = Vec3::new(position.x, terrain_height + 1.0, position.z);
+                
                 let zone = SpawnZone::new(
-                    position,
+                    corrected_position,
                     3.0 + (attempts as f32 * 0.1).min(2.0), // Variable radius
                     (2 + (attempts % 3)) as u32, // Variable enemy count
                     vec!["dark-knight".to_string()],
