@@ -1,18 +1,22 @@
-use bevy::prelude::*;
-use crate::components::{Player, Enemy, Name as EnemyName, ResourceType, ResourceDisplay};
+use crate::components::{Enemy, Name as EnemyName, Player, ResourceDisplay, ResourceType};
+use crate::plugins::ui_common::{spawn_resource_bar, update_resource_display};
 use crate::resources::GameState;
-use crate::plugins::ui_common::update_resource_display;
+use bevy::prelude::*;
 
 pub struct TooltipPlugin;
 
 impl Plugin for TooltipPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (
-            update_enemy_tooltips,
-            position_tooltips,
-            update_tooltip_resources,
-            cleanup_dead_enemy_tooltips,
-        ).run_if(in_state(GameState::Playing)))
+        app.add_systems(
+            Update,
+            (
+                update_enemy_tooltips,
+                position_tooltips,
+                update_tooltip_resources,
+                cleanup_dead_enemy_tooltips,
+            )
+                .run_if(in_state(GameState::Playing)),
+        )
         .add_systems(OnExit(GameState::Playing), cleanup_all_tooltips);
     }
 }
@@ -38,40 +42,57 @@ fn update_enemy_tooltips(
         let tooltip_exists = existing_tooltips
             .iter()
             .any(|tooltip| tooltip.enemy_entity == enemy_entity);
-            
+
         if !tooltip_exists {
             // Create tooltip UI
-            commands.spawn((
-                Node {
-                    position_type: PositionType::Absolute,
-                    width: Val::Px(120.0),
-                    height: Val::Px(70.0),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    flex_direction: FlexDirection::Column,
-                    ..default()
-                },
-                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
-                EnemyTooltip { enemy_entity },
-                GlobalZIndex(1000), // Ensure tooltips appear on top
-            )).with_children(|parent| {
-                // Enemy name
-                parent.spawn((
-                    Text::new(name.0.clone()),
-                    TextFont { font_size: 11.0, ..default() },
-                    TextColor(Color::WHITE),
+            commands
+                .spawn((
                     Node {
-                        margin: UiRect::bottom(Val::Px(2.0)),
+                        position_type: PositionType::Absolute,
+                        width: Val::Px(120.0),
+                        height: Val::Px(70.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        flex_direction: FlexDirection::Column,
                         ..default()
                     },
-                    TooltipNameText,
-                ));
-                
-                // Create consolidated resource bars for tooltip
-                for resource_type in [ResourceType::Health, ResourceType::Mana, ResourceType::Energy] {
-                    spawn_tooltip_resource_bar(parent, resource_type, enemy_entity);
-                }
-            });
+                    BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
+                    EnemyTooltip { enemy_entity },
+                    GlobalZIndex(1000), // Ensure tooltips appear on top
+                ))
+                .with_children(|parent| {
+                    // Enemy name
+                    parent.spawn((
+                        Text::new(name.0.clone()),
+                        TextFont {
+                            font_size: 11.0,
+                            ..default()
+                        },
+                        TextColor(Color::WHITE),
+                        Node {
+                            margin: UiRect::bottom(Val::Px(2.0)),
+                            ..default()
+                        },
+                        TooltipNameText,
+                    ));
+
+                    // Create consolidated resource bars for tooltip
+                    for resource_type in [
+                        ResourceType::Health,
+                        ResourceType::Mana,
+                        ResourceType::Energy,
+                    ] {
+                        spawn_resource_bar(
+                            parent,
+                            resource_type,
+                            enemy_entity,
+                            100.0,
+                            6.0,
+                            UiRect::vertical(Val::Px(1.0)),
+                            false,
+                        );
+                    }
+                });
         }
     }
 }
@@ -82,9 +103,11 @@ fn position_tooltips(
     camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     windows: Query<&Window>,
 ) {
-    let Ok((camera, camera_transform)) = camera_query.single() else { return; };
-    let Ok(_window) = windows.single() else { return; };
-    
+    let (camera, camera_transform) = camera_query.single()
+        .expect("Camera3d should always exist when game is running");
+    let _window = windows.single()
+        .expect("Primary window should always exist when game is running");
+
     for (mut tooltip_node, enemy_tooltip) in tooltip_query.iter_mut() {
         if let Ok((enemy_transform, enemy)) = enemy_query.get(enemy_tooltip.enemy_entity) {
             // Don't show tooltips for dying enemies
@@ -92,12 +115,12 @@ fn position_tooltips(
                 tooltip_node.display = Display::None;
                 continue;
             }
-            
+
             tooltip_node.display = Display::Flex;
-            
+
             // Convert world position to screen position
             let world_pos = enemy_transform.translation + Vec3::new(0.0, 2.0, 0.0); // Offset above enemy
-            
+
             if let Ok(screen_pos) = camera.world_to_viewport(camera_transform, world_pos) {
                 // Position tooltip at screen coordinates
                 tooltip_node.left = Val::Px(screen_pos.x - 60.0); // Center horizontally
@@ -111,33 +134,6 @@ fn position_tooltips(
             tooltip_node.display = Display::None;
         }
     }
-}
-
-fn spawn_tooltip_resource_bar(
-    parent: &mut bevy::prelude::ChildSpawnerCommands,
-    resource_type: ResourceType,
-    enemy_entity: Entity,
-) {
-    parent.spawn((
-        Node {
-            width: Val::Px(100.0),
-            height: Val::Px(6.0),
-            margin: UiRect::vertical(Val::Px(1.0)),
-            ..default()
-        },
-        BackgroundColor(Color::srgb(0.2, 0.2, 0.2)),
-        ResourceDisplay::new(resource_type, enemy_entity, false), // No text for tooltips
-    )).with_children(|bar_container| {
-        // Resource bar fill
-        bar_container.spawn((
-            Node {
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                ..default()
-            },
-            BackgroundColor(resource_type.color()),
-        ));
-    });
 }
 
 fn update_tooltip_resources(
@@ -180,10 +176,7 @@ fn cleanup_dead_enemy_tooltips(
     }
 }
 
-fn cleanup_all_tooltips(
-    mut commands: Commands,
-    tooltip_query: Query<Entity, With<EnemyTooltip>>,
-) {
+fn cleanup_all_tooltips(mut commands: Commands, tooltip_query: Query<Entity, With<EnemyTooltip>>) {
     // Remove all tooltips when exiting the Playing state
     for tooltip_entity in tooltip_query.iter() {
         commands.entity(tooltip_entity).despawn();
