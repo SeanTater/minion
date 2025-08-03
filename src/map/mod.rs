@@ -74,7 +74,7 @@ impl MapDefinition {
     pub fn get_maps_dir() -> MinionResult<PathBuf> {
         std::env::current_dir()
             .map_err(MinionError::ConfigDirCreationFailed)
-            .map(|dir| dir.join("maps"))
+            .map(|dir| dir.join("assets").join("maps"))
     }
 
     /// Load a map from the maps directory

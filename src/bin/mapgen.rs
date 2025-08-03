@@ -2,13 +2,15 @@ use clap::Parser;
 use minion::game_logic::errors::MinionResult;
 use minion::map::MapDefinition;
 
-mod cli_utils;
-mod terrain_builder;
-mod map_generator;
+mod mapgen {
+    pub mod cli_utils;
+    pub mod terrain_builder;
+    pub mod map_generator;
+}
 
-use cli_utils::*;
-use terrain_builder::TerrainBuilder;
-use map_generator::{MapGenerator, MapGenerationConfig};
+use mapgen::cli_utils::*;
+use mapgen::terrain_builder::TerrainBuilder;
+use mapgen::map_generator::{MapGenerator, MapGenerationConfig};
 
 #[derive(Parser, Clone)]
 #[command(name = "mapgen")]
@@ -22,7 +24,7 @@ struct Args {
     #[arg(long, default_value = "64x64")]
     size: String,
 
-    /// Output file path relative to maps/ directory (e.g., "my_map.bin" or "folder/my_map.bin")
+    /// Output file path relative to assets/maps/ directory (e.g., "my_map.bin" or "folder/my_map.bin")
     #[arg(long)]
     output: Option<String>,
 
@@ -43,7 +45,7 @@ struct Args {
     amplitude: f32,
 
     /// Base frequency for noise (terrain feature density)
-    #[arg(long, default_value = "0.1")]
+    #[arg(long, default_value = "0.01")]
     frequency: f32,
 
     /// Number of noise octaves for detail
@@ -61,6 +63,30 @@ struct Args {
     /// Object scale range as min,max (e.g., "0.8,1.2")
     #[arg(long, default_value = "0.8,1.2")]
     object_scale: String,
+
+    /// Terrain scale (world units per grid cell - smaller = higher density)
+    #[arg(long, default_value = "0.5")]
+    scale: f32,
+
+    /// Enable biome generation for varied terrain types
+    #[arg(long)]
+    biomes: bool,
+
+    /// Number of biome regions (only used with --biomes)
+    #[arg(long, default_value = "6")]
+    biome_regions: u32,
+
+    /// Enable path network generation
+    #[arg(long)]
+    paths: bool,
+
+    /// Number of main roads to generate (only used with --paths)
+    #[arg(long, default_value = "3")]
+    main_roads: u32,
+
+    /// Number of trails per biome region (only used with --paths)
+    #[arg(long, default_value = "2")]
+    trails_per_biome: u32,
 }
 
 fn validate_output_path(filename: &str) -> MinionResult<()> {
@@ -71,7 +97,7 @@ fn validate_output_path(filename: &str) -> MinionResult<()> {
     if path.is_absolute() {
         return Err(minion::game_logic::errors::MinionError::InvalidMapData {
             reason: format!(
-                "Output path must be relative to maps/ directory, got absolute path: {}",
+                "Output path must be relative to assets/maps/ directory, got absolute path: {}",
                 filename
             ),
         });
@@ -119,6 +145,12 @@ fn main() -> MinionResult<()> {
         object_density,
         object_types,
         scale_range,
+        terrain_scale: args.scale,
+        enable_biomes: args.biomes,
+        biome_regions: args.biome_regions,
+        enable_paths: args.paths,
+        main_roads: args.main_roads,
+        trails_per_biome: args.trails_per_biome,
     };
 
     // Generate the map
@@ -184,6 +216,12 @@ mod tests {
             objects: 0.1,
             object_types: "tree,rock".to_string(),
             object_scale: "0.8,1.2".to_string(),
+            scale: 0.5,
+            biomes: false,
+            biome_regions: 6,
+            paths: false,
+            main_roads: 3,
+            trails_per_biome: 2,
         };
 
         // Test parsing
