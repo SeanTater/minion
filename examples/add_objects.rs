@@ -14,7 +14,7 @@
 //! # Add specific object types with custom scale range
 //! cargo run --example add_objects -- --input map.bin --output custom_map.bin --types "tree,rock,bush" --count 75 --scale "0.5,2.0"
 //!
-//! # Dry run to see placement without making changes  
+//! # Dry run to see placement without making changes
 //! cargo run --example add_objects -- --input map.bin --output test.bin --type rock --count 20 --dry-run
 //! ```
 

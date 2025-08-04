@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 use minion::game_logic::errors::MinionResult;
 use minion::map::{EnvironmentObject, MapDefinition, SpawnZone, TerrainData};
-use minion::terrain_generation::{TerrainGenerator, is_suitable_for_spawning};
 use minion::terrain::biome_integration::BiomeIntegration;
 use minion::terrain::biomes::BiomeType;
 use minion::terrain::path_generator::PathGenerationConfig;
+use minion::terrain_generation::{TerrainGenerator, is_suitable_for_spawning};
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64;
 
@@ -31,27 +31,39 @@ impl MapGenerator {
     /// Correct spawn height to match terrain elevation at that position
     fn correct_spawn_height(terrain: &TerrainData, spawn_pos: Vec3) -> MinionResult<Vec3> {
         use minion::terrain::coordinates::get_height_at_world_interpolated;
-        
-        let terrain_height = get_height_at_world_interpolated(terrain, spawn_pos.x, spawn_pos.z)
-            .unwrap_or(0.0);
-        
+
+        let terrain_height =
+            get_height_at_world_interpolated(terrain, spawn_pos.x, spawn_pos.z).unwrap_or(0.0);
+
         // Spawn 1.0 unit above the terrain
         Ok(Vec3::new(spawn_pos.x, terrain_height + 1.0, spawn_pos.z))
     }
 
     pub fn generate(config: MapGenerationConfig) -> MinionResult<MapDefinition> {
         println!("Generating map: {}", config.name);
-        println!("Terrain size: {}x{} grid cells", config.width, config.height);
+        println!(
+            "Terrain size: {}x{} grid cells",
+            config.width, config.height
+        );
         println!("Player spawn: {}", config.player_spawn);
         println!("Using terrain type (seed: {})", config.generator.seed);
 
         // Generate terrain
-        let terrain = config.generator.generate(config.width, config.height, config.terrain_scale)?;
-        println!("Generated terrain with {} height points", terrain.heights.len());
+        let terrain =
+            config
+                .generator
+                .generate(config.width, config.height, config.terrain_scale)?;
+        println!(
+            "Generated terrain with {} height points",
+            terrain.heights.len()
+        );
 
         // Fix player spawn height to match terrain elevation
         let corrected_player_spawn = Self::correct_spawn_height(&terrain, config.player_spawn)?;
-        println!("Corrected player spawn from {} to {}", config.player_spawn, corrected_player_spawn);
+        println!(
+            "Corrected player spawn from {} to {}",
+            config.player_spawn, corrected_player_spawn
+        );
 
         // Generate biome data if enabled
         let biome_data = if config.enable_biomes {
@@ -67,9 +79,11 @@ impl MapGenerator {
 
         // Generate path network if enabled
         let _path_network = if config.enable_paths {
-            println!("Generating path network with {} main roads, {} trails per biome", 
-                config.main_roads, config.trails_per_biome);
-            
+            println!(
+                "Generating path network with {} main roads, {} trails per biome",
+                config.main_roads, config.trails_per_biome
+            );
+
             let path_config = PathGenerationConfig {
                 main_roads: config.main_roads,
                 trails_per_biome: config.trails_per_biome,
@@ -78,7 +92,7 @@ impl MapGenerator {
 
             Some(BiomeIntegration::generate_path_network(
                 &terrain,
-                biome_data.as_ref(),  
+                biome_data.as_ref(),
                 config.generator.seed.wrapping_add(2022) as u64,
                 Some(path_config),
             )?)
@@ -88,7 +102,12 @@ impl MapGenerator {
 
         // Generate spawn zones (biome-aware if biomes enabled)
         let enemy_zones = if let Some(ref biome_data) = biome_data {
-            Self::generate_biome_aware_spawn_zones(&terrain, &biome_data.blend_map, corrected_player_spawn, 5)?
+            Self::generate_biome_aware_spawn_zones(
+                &terrain,
+                &biome_data.blend_map,
+                corrected_player_spawn,
+                5,
+            )?
         } else {
             Self::generate_spawn_zones(&terrain, corrected_player_spawn, 5)?
         };
@@ -146,8 +165,9 @@ impl MapGenerator {
 
             if is_suitable_for_spawning(terrain, position.x, position.z, max_slope) {
                 let terrain_height = minion::terrain::coordinates::get_height_at_world_nearest(
-                    terrain, position.x, position.z
-                ).unwrap_or(0.0);
+                    terrain, position.x, position.z,
+                )
+                .unwrap_or(0.0);
 
                 let final_center = Vec3::new(position.x, terrain_height + 1.0, position.z);
                 let radius = base_radius + (i % 3) as f32 * 0.5;
@@ -160,15 +180,20 @@ impl MapGenerator {
                     vec!["dark-knight".to_string()],
                 )?);
 
-                println!("Found suitable spawn location at ({:.1}, {:.1}, {:.1})",
-                    final_center.x, final_center.y, final_center.z);
+                println!(
+                    "Found suitable spawn location at ({:.1}, {:.1}, {:.1})",
+                    final_center.x, final_center.y, final_center.z
+                );
             }
             attempts += 1;
         }
 
         if zones.len() < num_zones as usize {
-            println!("Warning: Only found {} suitable spawn locations out of {} requested",
-                zones.len(), num_zones);
+            println!(
+                "Warning: Only found {} suitable spawn locations out of {} requested",
+                zones.len(),
+                num_zones
+            );
         }
 
         Ok(zones)
@@ -196,7 +221,8 @@ impl MapGenerator {
         let mut rng = Pcg64::seed_from_u64(seed as u64);
         let mut objects = Vec::new();
 
-        let terrain_area = (terrain.width as f32 * terrain.scale) * (terrain.height as f32 * terrain.scale);
+        let terrain_area =
+            (terrain.width as f32 * terrain.scale) * (terrain.height as f32 * terrain.scale);
         let max_objects = 200.min((terrain_area * density * 0.01) as u32);
 
         let constraints = ObjectPlacementConstraints {
@@ -213,16 +239,25 @@ impl MapGenerator {
 
         while objects.len() < max_objects as usize && attempts < max_attempts {
             if let Some(obj) = Self::try_place_object(
-                terrain, player_spawn, enemy_zones, &objects, object_types,
-                scale_range, &constraints, &mut rng
+                terrain,
+                player_spawn,
+                enemy_zones,
+                &objects,
+                object_types,
+                scale_range,
+                &constraints,
+                &mut rng,
             )? {
                 objects.push(obj);
             }
             attempts += 1;
         }
 
-        println!("Placed {} environment objects (attempted {} placements)",
-            objects.len(), attempts);
+        println!(
+            "Placed {} environment objects (attempted {} placements)",
+            objects.len(),
+            attempts
+        );
 
         Ok(objects)
     }
@@ -240,13 +275,22 @@ impl MapGenerator {
         let world_x = rng.gen_range(1.0..(terrain.width as f32 - 1.0) * terrain.scale);
         let world_z = rng.gen_range(1.0..(terrain.height as f32 - 1.0) * terrain.scale);
 
-        let terrain_height = match minion::terrain::coordinates::get_height_at_world_nearest(terrain, world_x, world_z) {
+        let terrain_height = match minion::terrain::coordinates::get_height_at_world_nearest(
+            terrain, world_x, world_z,
+        ) {
             Some(height) => height,
             None => return Ok(None),
         };
         let candidate_pos = Vec3::new(world_x, terrain_height, world_z);
 
-        if !Self::is_valid_placement(&candidate_pos, player_spawn, enemy_zones, existing_objects, terrain, constraints) {
+        if !Self::is_valid_placement(
+            &candidate_pos,
+            player_spawn,
+            enemy_zones,
+            existing_objects,
+            terrain,
+            constraints,
+        ) {
             return Ok(None);
         }
 
@@ -255,7 +299,12 @@ impl MapGenerator {
         let scale_factor = rng.gen_range(scale_range.0..=scale_range.1);
         let scale = Vec3::splat(scale_factor);
 
-        Ok(Some(EnvironmentObject::new(object_type, candidate_pos, rotation, scale)))
+        Ok(Some(EnvironmentObject::new(
+            object_type,
+            candidate_pos,
+            rotation,
+            scale,
+        )))
     }
 
     fn is_valid_placement(
@@ -269,12 +318,18 @@ impl MapGenerator {
         // Check distance constraints
         candidate_pos.distance(player_spawn) >= constraints.min_distance_from_spawn
             && enemy_zones.iter().all(|zone| {
-                candidate_pos.distance(zone.center) >= zone.radius + constraints.min_distance_from_enemies
+                candidate_pos.distance(zone.center)
+                    >= zone.radius + constraints.min_distance_from_enemies
             })
             && existing_objects.iter().all(|obj| {
                 candidate_pos.distance(obj.position) >= constraints.min_distance_between_objects
             })
-            && is_suitable_for_spawning(terrain, candidate_pos.x, candidate_pos.z, constraints.max_slope)
+            && is_suitable_for_spawning(
+                terrain,
+                candidate_pos.x,
+                candidate_pos.z,
+                constraints.max_slope,
+            )
     }
 }
 
@@ -294,7 +349,7 @@ impl MapGenerator {
         max_zones: usize,
     ) -> MinionResult<Vec<SpawnZone>> {
         use minion::terrain::biomes::BiomeType;
-        
+
         let mut zones = Vec::new();
         let mut attempts = 0;
         let max_attempts = max_zones * 10;
@@ -304,7 +359,7 @@ impl MapGenerator {
 
             // Calculate position using ring-based placement
             let position = Self::calculate_ring_position(player_spawn, attempts as u32);
-            
+
             // Check biome suitability
             if let Some(blend) = biome_map.get_blend_at_world(position.x, position.z) {
                 if let Some(dominant_biome) = blend.dominant_biome() {
@@ -319,14 +374,15 @@ impl MapGenerator {
             if is_suitable_for_spawning(terrain, position.x, position.z, 0.3) {
                 // Get terrain height and spawn 1.0 unit above it
                 let terrain_height = minion::terrain::coordinates::get_height_at_world_nearest(
-                    terrain, position.x, position.z
-                ).unwrap_or(0.0);
+                    terrain, position.x, position.z,
+                )
+                .unwrap_or(0.0);
                 let corrected_position = Vec3::new(position.x, terrain_height + 1.0, position.z);
-                
+
                 let zone = SpawnZone::new(
                     corrected_position,
                     3.0 + (attempts as f32 * 0.1).min(2.0), // Variable radius
-                    (2 + (attempts % 3)) as u32, // Variable enemy count
+                    (2 + (attempts % 3)) as u32,            // Variable enemy count
                     vec!["dark-knight".to_string()],
                 )?;
                 zones.push(zone);
@@ -352,7 +408,6 @@ impl MapGenerator {
         scale_range: (f32, f32),
         seed: u32,
     ) -> MinionResult<Vec<EnvironmentObject>> {
-        
         let mut objects = Vec::new();
         let mut rng = Pcg64::seed_from_u64(seed as u64);
 
@@ -368,7 +423,10 @@ impl MapGenerator {
         let area = world_width * world_height;
         let target_objects = (area * density).round() as usize;
 
-        println!("Placing up to {} biome-aware environment objects (density: {})...", target_objects, density);
+        println!(
+            "Placing up to {} biome-aware environment objects (density: {})...",
+            target_objects, density
+        );
 
         let mut attempts = 0;
         let max_attempts = target_objects * 10;
@@ -396,7 +454,9 @@ impl MapGenerator {
 
             // Get biome-specific scale based on object type
             let scale = Self::get_biome_object_scale(
-                biome_map.get_blend_at_world(x, z).and_then(|b| b.dominant_biome()),
+                biome_map
+                    .get_blend_at_world(x, z)
+                    .and_then(|b| b.dominant_biome()),
                 object_type,
                 scale_range,
                 &mut rng,
@@ -419,14 +479,18 @@ impl MapGenerator {
             }
         }
 
-        println!("Placed {} biome-aware environment objects (attempted {} placements)", objects.len(), attempts);
-        
+        println!(
+            "Placed {} biome-aware environment objects (attempted {} placements)",
+            objects.len(),
+            attempts
+        );
+
         // Print object summary
         let mut object_counts = std::collections::HashMap::new();
         for obj in &objects {
             *object_counts.entry(&obj.object_type).or_insert(0) += 1;
         }
-        
+
         if !object_counts.is_empty() {
             println!("  Object types:");
             for (obj_type, count) in object_counts {
@@ -438,9 +502,12 @@ impl MapGenerator {
     }
 
     /// Get objects appropriate for a specific biome
-    fn get_biome_appropriate_objects(biome: Option<BiomeType>, available_types: &[String]) -> Vec<String> {
+    fn get_biome_appropriate_objects(
+        biome: Option<BiomeType>,
+        available_types: &[String],
+    ) -> Vec<String> {
         use BiomeType::*;
-        
+
         match biome {
             Some(Forest) => {
                 // Forest: Lots of trees, some rocks
@@ -479,7 +546,8 @@ impl MapGenerator {
             }
             Some(Desert) => {
                 // Desert: Mostly rocks, no trees
-                available_types.iter()
+                available_types
+                    .iter()
                     .filter(|obj| obj.as_str() != "tree")
                     .cloned()
                     .collect()
@@ -520,14 +588,14 @@ impl MapGenerator {
         rng: &mut Pcg64,
     ) -> f32 {
         use BiomeType::*;
-        
+
         let scale_modifier = match (biome, object_type) {
             // Trees
             (Some(Forest), "tree") => rng.gen_range(1.2..2.0), // Large forest trees
             (Some(Mountains), "tree") => rng.gen_range(0.6..1.0), // Smaller mountain trees
             (Some(Plains), "tree") => rng.gen_range(0.8..1.4), // Medium plains trees
             (Some(Tundra), "tree") => rng.gen_range(0.4..0.8), // Small tundra trees
-            
+
             // Rocks with size distribution
             (Some(Mountains), "rock") => {
                 // Mountains have larger rocks with log-normal distribution
@@ -549,7 +617,7 @@ impl MapGenerator {
                 let base = rng.gen_range(0.0..1.0_f32).powf(0.6);
                 0.4 + base * 1.4 // Range: 0.4 to 1.8
             }
-            
+
             // Default cases
             _ => rng.gen_range(base_scale_range.0..base_scale_range.1),
         };
@@ -618,10 +686,10 @@ mod tests {
         let player_spawn = Vec3::new(32.0, 1.0, 32.0);
         let pos1 = MapGenerator::calculate_ring_position(player_spawn, 0);
         let pos2 = MapGenerator::calculate_ring_position(player_spawn, 1);
-        
+
         // Positions should be different
         assert_ne!(pos1, pos2);
-        
+
         // Should be roughly the expected distance from spawn (8.0 to 14.0 based on new logic)
         let distance1 = pos1.distance(player_spawn);
         assert!(distance1 >= 7.0 && distance1 <= 15.0);
@@ -631,10 +699,10 @@ mod tests {
     fn test_generate_spawn_zones() {
         let player_spawn = Vec3::new(32.0, 1.0, 32.0);
         let terrain = TerrainData::create_flat(64, 64, 1.0, 0.0).unwrap();
-        
+
         // Test that the function runs without error, terrain suitability depends on complex logic
         let zones = MapGenerator::generate_spawn_zones(&terrain, player_spawn, 3).unwrap();
-        
+
         // Test any zones that were created have correct properties
         for zone in &zones {
             assert!(zone.radius >= 3.0);

@@ -8,8 +8,8 @@ pub struct EnvironmentPlugin;
 impl Plugin for EnvironmentPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
-            OnEnter(GameState::Playing), 
-            spawn_environment_objects.after(crate::plugins::map_loader::load_map)
+            OnEnter(GameState::Playing),
+            spawn_environment_objects.after(crate::plugins::map_loader::load_map),
         );
     }
 }
@@ -90,10 +90,7 @@ fn create_placeholder_mesh_and_material(
         }
         "rock" => {
             // Rock: slightly flattened sphere
-            (
-                Sphere::new(0.8).mesh().uv(8, 6),
-                Color::srgb(0.5, 0.5, 0.5),
-            )
+            (Sphere::new(0.8).mesh().uv(8, 6), Color::srgb(0.5, 0.5, 0.5))
         }
         "boulder" => {
             // Boulder: larger, more irregular (use a cube for now)

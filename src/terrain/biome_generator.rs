@@ -1,4 +1,4 @@
-use super::biomes::{BiomeBlend, BiomeConfig, BiomeMap, BiomeType, BiomeData};
+use super::biomes::{BiomeBlend, BiomeConfig, BiomeData, BiomeMap, BiomeType};
 use super::constants::*;
 use crate::game_logic::errors::{MinionError, MinionResult};
 use crate::map::TerrainData;
@@ -6,7 +6,7 @@ use bevy::prelude::*;
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg64;
 use std::collections::HashMap;
-use voronoice::{VoronoiBuilder, Point, BoundingBox, Voronoi};
+use voronoice::{BoundingBox, Point, Voronoi, VoronoiBuilder};
 
 /// Configuration for biome generation
 #[derive(Debug, Clone)]
@@ -51,7 +51,10 @@ impl Default for BiomeGenerationConfig {
 
 impl BiomeGenerator {
     /// Create a new biome generator
-    pub fn new(config: BiomeGenerationConfig, biome_configs: HashMap<BiomeType, BiomeConfig>) -> Self {
+    pub fn new(
+        config: BiomeGenerationConfig,
+        biome_configs: HashMap<BiomeType, BiomeConfig>,
+    ) -> Self {
         let rng = Pcg64::seed_from_u64(config.seed as u64);
         Self {
             config,
@@ -63,7 +66,10 @@ impl BiomeGenerator {
 
     /// Generate a biome map for the given terrain
     pub fn generate(&mut self, terrain: &TerrainData) -> MinionResult<BiomeMap> {
-        info!("Generating biome map with {} regions", self.config.region_count);
+        info!(
+            "Generating biome map with {} regions",
+            self.config.region_count
+        );
 
         // Calculate world bounds
         let world_width = terrain.width as f32 * terrain.scale;
@@ -72,7 +78,8 @@ impl BiomeGenerator {
         let half_height = world_height / 2.0;
 
         // Get or build cached Voronoi diagram
-        let (voronoi, regions) = if let Some((cached_voronoi, cached_regions)) = &self.voronoi_cache {
+        let (voronoi, regions) = if let Some((cached_voronoi, cached_regions)) = &self.voronoi_cache
+        {
             (cached_voronoi, cached_regions)
         } else {
             // Generate random Voronoi sites
@@ -87,7 +94,7 @@ impl BiomeGenerator {
                 world_width as f64,
                 world_height as f64,
             );
-            
+
             let voronoi = VoronoiBuilder::default()
                 .set_sites(sites)
                 .set_bounding_box(bbox)
@@ -109,13 +116,16 @@ impl BiomeGenerator {
             for x in 0..terrain.width {
                 let world_x = (x as f32 * terrain.scale) - half_width;
                 let world_z = (z as f32 * terrain.scale) - half_height;
-                
+
                 let blend = self.calculate_biome_blend_at_position(
-                    Point { x: world_x as f64, y: world_z as f64 },
+                    Point {
+                        x: world_x as f64,
+                        y: world_z as f64,
+                    },
                     regions,
                     voronoi,
                 )?;
-                
+
                 blends.push(blend);
             }
         }
@@ -132,7 +142,7 @@ impl BiomeGenerator {
     pub fn generate_biome_data(&mut self, terrain: &TerrainData) -> MinionResult<BiomeData> {
         // Generate the smooth blend map
         let blend_map = self.generate(terrain)?;
-        
+
         // Create discrete biome map for pathfinding
         let mut biome_map = Vec::with_capacity(terrain.height as usize);
         for z in 0..terrain.height {
@@ -154,7 +164,11 @@ impl BiomeGenerator {
     }
 
     /// Generate random Voronoi sites across the terrain
-    fn generate_voronoi_sites(&mut self, world_width: f32, world_height: f32) -> MinionResult<Vec<Point>> {
+    fn generate_voronoi_sites(
+        &mut self,
+        world_width: f32,
+        world_height: f32,
+    ) -> MinionResult<Vec<Point>> {
         let mut sites = Vec::new();
         let half_width = world_width / 2.0;
         let half_height = world_height / 2.0;
@@ -187,7 +201,10 @@ impl BiomeGenerator {
 
         if sites.len() < MIN_VORONOI_SITES {
             return Err(MinionError::InvalidMapData {
-                reason: format!("Need at least {} Voronoi sites for diagram generation", MIN_VORONOI_SITES),
+                reason: format!(
+                    "Need at least {} Voronoi sites for diagram generation",
+                    MIN_VORONOI_SITES
+                ),
             });
         }
 
@@ -196,7 +213,11 @@ impl BiomeGenerator {
     }
 
     /// Assign biome types to Voronoi sites based on terrain characteristics
-    fn assign_biomes_to_sites(&mut self, sites: &[Point], terrain: &TerrainData) -> MinionResult<Vec<BiomeRegion>> {
+    fn assign_biomes_to_sites(
+        &mut self,
+        sites: &[Point],
+        terrain: &TerrainData,
+    ) -> MinionResult<Vec<BiomeRegion>> {
         let mut regions = Vec::new();
 
         for (i, site) in sites.iter().enumerate() {
@@ -226,14 +247,18 @@ impl BiomeGenerator {
         // Convert world coordinates to grid coordinates
         let half_width = (terrain.width as f32 * terrain.scale) / 2.0;
         let half_height = (terrain.height as f32 * terrain.scale) / 2.0;
-        
+
         let grid_x = ((point.x as f32 + half_width) / terrain.scale).round() as i32;
         let grid_z = ((point.y as f32 + half_height) / terrain.scale).round() as i32;
-        
-        if grid_x < 0 || grid_z < 0 || grid_x >= terrain.width as i32 || grid_z >= terrain.height as i32 {
+
+        if grid_x < 0
+            || grid_z < 0
+            || grid_x >= terrain.width as i32
+            || grid_z >= terrain.height as i32
+        {
             return 0.0;
         }
-        
+
         let index = (grid_z as u32 * terrain.width + grid_x as u32) as usize;
         terrain.heights.get(index).copied().unwrap_or(0.0)
     }
@@ -243,19 +268,28 @@ impl BiomeGenerator {
         // Convert world coordinates to grid coordinates
         let half_width = (terrain.width as f32 * terrain.scale) / 2.0;
         let half_height = (terrain.height as f32 * terrain.scale) / 2.0;
-        
+
         let grid_x = ((point.x as f32 + half_width) / terrain.scale).round() as i32;
         let grid_z = ((point.y as f32 + half_height) / terrain.scale).round() as i32;
-        
-        if grid_x < 1 || grid_z < 1 || grid_x >= (terrain.width - 1) as i32 || grid_z >= (terrain.height - 1) as i32 {
+
+        if grid_x < 1
+            || grid_z < 1
+            || grid_x >= (terrain.width - 1) as i32
+            || grid_z >= (terrain.height - 1) as i32
+        {
             return 0.0;
         }
-        
+
         crate::terrain_generation::calculate_slope(terrain, grid_x as u32, grid_z as u32)
     }
 
     /// Select the best biome type for a location based on characteristics
-    fn select_biome_for_location(&mut self, elevation: f32, slope: f32, site_index: usize) -> BiomeType {
+    fn select_biome_for_location(
+        &mut self,
+        elevation: f32,
+        slope: f32,
+        site_index: usize,
+    ) -> BiomeType {
         // Start with preferred biomes or cycle through them
         let preferred_biome = if !self.config.biome_preferences.is_empty() {
             self.config.biome_preferences[site_index % self.config.biome_preferences.len()]
@@ -296,8 +330,9 @@ impl BiomeGenerator {
         let mut influences = Vec::new();
 
         for region in regions {
-            let distance = ((point.x - region.center.x).powi(2) + (point.y - region.center.y).powi(2)).sqrt();
-            
+            let distance =
+                ((point.x - region.center.x).powi(2) + (point.y - region.center.y).powi(2)).sqrt();
+
             // Apply smooth falloff based on transition radius
             let influence = if distance <= self.config.transition_radius as f64 {
                 // Use smoothstep for natural falloff

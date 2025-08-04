@@ -54,12 +54,21 @@ fn spawn_enemies(
 }
 
 fn enemy_ai(
-    mut enemy_query: Query<(&mut Transform, &Enemy, &mut KinematicCharacterController), (With<Enemy>, Without<Player>)>,
+    mut enemy_query: Query<
+        (
+            &mut Transform,
+            &Enemy,
+            &mut KinematicCharacterController,
+            &mut PathfindingAgent,
+        ),
+        (With<Enemy>, Without<Player>),
+    >,
     player_query: Query<&Transform, (With<Player>, Without<Enemy>)>,
     game_config: Res<GameConfig>,
     time: Res<Time>,
 ) {
-    let player_transform = player_query.single()
+    let player_transform = player_query
+        .single()
         .expect("Player should always exist when in Playing state");
     let player_pos_2d = Vec3::new(
         player_transform.translation.x,
@@ -70,14 +79,16 @@ fn enemy_ai(
     // First pass: collect all enemy positions for separation calculation
     let enemy_positions: Vec<(Vec3, bool)> = enemy_query
         .iter()
-        .map(|(transform, enemy, _controller)| {
+        .map(|(transform, enemy, _controller, _agent)| {
             let pos = Vec3::new(transform.translation.x, 0.0, transform.translation.z);
             (pos, enemy.is_dying)
         })
         .collect();
 
-    // Second pass: update each enemy with kinematic movement
-    for (i, (mut enemy_transform, enemy, mut controller)) in enemy_query.iter_mut().enumerate() {
+    // Second pass: update each enemy with hybrid pathfinding + flocking behavior
+    for (i, (mut enemy_transform, enemy, mut controller, mut pathfinding_agent)) in
+        enemy_query.iter_mut().enumerate()
+    {
         if enemy.is_dying {
             continue; // Skip dying enemies
         }
@@ -93,9 +104,24 @@ fn enemy_ai(
         if distance <= enemy.chase_distance.0
             && distance > game_config.settings.enemy_stopping_distance
         {
-            let mut direction = (player_pos_2d - enemy_pos_2d).normalize();
+            // Set pathfinding destination to player position for long-range navigation
+            pathfinding_agent.destination = Some(player_transform.translation);
 
-            // Add separation force - avoid other enemies
+            // Determine movement target: use pathfinding for long-range, direct for close-range
+            let pathfinding_waypoint = pathfinding_agent.current_waypoint();
+            let movement_target = if distance > 10.0 && pathfinding_waypoint.is_some() {
+                // Long-range: use pathfinding waypoint
+                pathfinding_waypoint.unwrap()
+            } else {
+                // Close-range: use direct path to player
+                player_transform.translation
+            };
+
+            // Calculate direction to movement target
+            let target_pos_2d = Vec3::new(movement_target.x, 0.0, movement_target.z);
+            let mut direction = (target_pos_2d - enemy_pos_2d).normalize();
+
+            // Add separation force - avoid other enemies (always apply for close-range interactions)
             let mut separation_force = Vec3::ZERO;
             let separation_radius = 2.0; // How far to avoid other enemies
 
@@ -118,8 +144,10 @@ fn enemy_ai(
                 }
             }
 
-            // Blend seek (toward player) with separation (away from other enemies)
-            direction = (direction + separation_force * 0.5).normalize_or_zero();
+            // Blend pathfinding/direct movement with separation forces
+            // Use stronger separation for very close enemies
+            let separation_weight = if distance < 5.0 { 0.7 } else { 0.3 };
+            direction = (direction + separation_force * separation_weight).normalize_or_zero();
 
             // Use kinematic character controller for movement
             let max_speed = enemy.speed.0 * game_config.settings.enemy_speed_multiplier;
@@ -127,7 +155,7 @@ fn enemy_ai(
             let movement = direction * move_distance;
             controller.translation = Some(movement);
 
-            // Rotate toward player
+            // Rotate toward movement direction
             // NOTE: GLB models are facing backwards, so we flip the direction
             if direction.length() > 0.1 {
                 let character_pos = enemy_transform.translation;
@@ -139,7 +167,9 @@ fn enemy_ai(
                 enemy_transform.look_at(flat_target, Vec3::Y);
             }
         } else {
-            // Not chasing - stop movement
+            // Not chasing - clear pathfinding destination and stop movement
+            pathfinding_agent.destination = None;
+            pathfinding_agent.clear_path();
             controller.translation = Some(Vec3::ZERO);
         }
     }
@@ -150,7 +180,8 @@ fn update_entity_lod(
     player_query: Query<&Transform, With<Player>>,
     game_config: Res<GameConfig>,
 ) {
-    let player_transform = player_query.single()
+    let player_transform = player_query
+        .single()
         .expect("Player should always exist when in Playing state");
     let player_pos = Vec3::new(
         player_transform.translation.x,

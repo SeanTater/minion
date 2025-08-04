@@ -1,0 +1,47 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
+    hooks:
+      - id: fmt
+        name: cargo fmt
+      - id: clippy
+        name: cargo clippy
+        args: ['--all-targets', '--all-features']
+
+  - repo: local
+    hooks:
+      - id: cargo-test
+        name: cargo test
+        entry: cargo test
+        language: system
+        pass_filenames: false
+        types: [rust]
+
+      - id: cargo-coverage
+        name: cargo coverage check (85% minimum)
+        entry: bash
+        args:
+          - -c
+          - |
+            if command -v cargo-llvm-cov >/dev/null 2>&1; then
+              cargo llvm-cov --html --lcov --output-path coverage.lcov
+              coverage=$(cargo llvm-cov --summary-only | grep "TOTAL" | awk '{print $4}' | sed 's/%//')
+              if (( $(echo "$coverage < 85" | bc -l) )); then
+                echo "Coverage $coverage% is below 85% threshold"
+                exit 1
+              fi
+            else
+              echo "cargo-llvm-cov not installed, skipping coverage check. Install with: cargo install cargo-llvm-cov"
+            fi
+        language: system
+        pass_filenames: false
+        types: [rust]
