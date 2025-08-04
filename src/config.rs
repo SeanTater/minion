@@ -78,7 +78,7 @@ mod tests {
     fn test_load_config_or_default_fallback() {
         // Test that load_config_or_default handles errors gracefully
         // This test verifies the function exists and returns a valid GameConfig
-        let config = load_config_or_default();
+        let _config = load_config_or_default();
 
         // Should always return a valid config (either loaded or default)
         // Score is u32, always non-negative by type system

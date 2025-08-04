@@ -67,7 +67,7 @@ cargo run --example smooth_terrain -- --input rough_terrain.bin --output flat_te
 - Terrain statistics before and after smoothing
 - Preserves terrain bounds and validation
 
-### 4. map_info.rs - Map Analysis and Statistics  
+### 4. map_info.rs - Map Analysis and Statistics
 Displays comprehensive information and statistics about map files for analysis and debugging.
 
 **Usage:**

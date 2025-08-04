@@ -158,12 +158,15 @@ pub fn is_suitable_for_spawning(
     world_z: f32,
     max_slope: f32,
 ) -> bool {
-    use crate::terrain::coordinates::{world_to_grid, is_valid_grid, get_height_at_grid};
-    
+    use crate::terrain::coordinates::{get_height_at_grid, is_valid_grid, world_to_grid};
+
     let (grid_x, grid_z) = world_to_grid(terrain, world_x, world_z);
-    
+
     // Check bounds (need margin for slope calculation)
-    if !is_valid_grid(terrain, grid_x, grid_z) || grid_x >= (terrain.width - 1) as f32 || grid_z >= (terrain.height - 1) as f32 {
+    if !is_valid_grid(terrain, grid_x, grid_z)
+        || grid_x >= (terrain.width - 1) as f32
+        || grid_z >= (terrain.height - 1) as f32
+    {
         return false;
     }
 
@@ -192,7 +195,8 @@ mod tests {
     fn test_flat_terrain_generation() {
         let generator = TerrainGenerator::new(12345, TerrainAlgorithm::Flat { height: 5.0 });
 
-        let terrain = generator.generate(10, 10, 1.0)
+        let terrain = generator
+            .generate(10, 10, 1.0)
             .expect("Terrain generation should succeed with valid parameters");
 
         assert_eq!(terrain.width, 10);
@@ -216,7 +220,8 @@ mod tests {
             },
         );
 
-        let terrain = generator.generate(8, 8, 1.0)
+        let terrain = generator
+            .generate(8, 8, 1.0)
             .expect("Terrain generation should succeed with valid parameters");
 
         assert_eq!(terrain.width, 8);
@@ -234,14 +239,13 @@ mod tests {
 
     #[test]
     fn test_terrain_presets() {
-        let flat = get_terrain_preset("flat", Some(123))
-            .expect("Flat terrain preset should exist");
-        let hills = get_terrain_preset("hills", Some(123))
-            .expect("Hills terrain preset should exist");
+        let flat = get_terrain_preset("flat", Some(123)).expect("Flat terrain preset should exist");
+        let hills =
+            get_terrain_preset("hills", Some(123)).expect("Hills terrain preset should exist");
         let mountains = get_terrain_preset("mountains", Some(123))
             .expect("Mountains terrain preset should exist");
-        let valleys = get_terrain_preset("valleys", Some(123))
-            .expect("Valleys terrain preset should exist");
+        let valleys =
+            get_terrain_preset("valleys", Some(123)).expect("Valleys terrain preset should exist");
 
         assert_eq!(flat.seed, 123);
         assert_eq!(hills.seed, 123);

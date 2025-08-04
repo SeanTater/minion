@@ -23,6 +23,6 @@ rg --no-heading --line-number --color=never \
        "mod") icon="📦" ;;
        *) icon="❓" ;;
      esac
-     
+
      printf "%-30s %3s %s %s\n" "$file" "$line" "$icon" "$content"
    done

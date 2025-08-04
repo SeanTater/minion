@@ -1,6 +1,6 @@
-use super::biome_generator::{BiomeGenerator, BiomeGenerationConfig};
-use super::biomes::{create_default_biomes, BiomeMap, BiomeType, BiomeData};
-use super::path_generator::{PathGenerator, PathGenerationConfig, PathNetwork};
+use super::biome_generator::{BiomeGenerationConfig, BiomeGenerator};
+use super::biomes::{BiomeData, BiomeMap, BiomeType, create_default_biomes};
+use super::path_generator::{PathGenerationConfig, PathGenerator, PathNetwork};
 use crate::game_logic::errors::MinionResult;
 use crate::map::TerrainData;
 
@@ -20,7 +20,7 @@ impl BiomeIntegration {
             transition_radius: 30.0, // Smaller for higher density terrain
             biome_preferences: vec![
                 BiomeType::Plains,
-                BiomeType::Forest, 
+                BiomeType::Forest,
                 BiomeType::Mountains,
                 BiomeType::Desert,
             ],
@@ -28,15 +28,12 @@ impl BiomeIntegration {
 
         let biome_configs = create_default_biomes();
         let mut generator = BiomeGenerator::new(config, biome_configs);
-        
+
         generator.generate(terrain)
     }
 
     /// Generate a simple biome map for testing (single biome)
-    pub fn generate_simple_biome_map(
-        terrain: &TerrainData,
-        biome_type: BiomeType,
-    ) -> BiomeMap {
+    pub fn generate_simple_biome_map(terrain: &TerrainData, biome_type: BiomeType) -> BiomeMap {
         BiomeMap::uniform(terrain.width, terrain.height, biome_type, terrain.scale)
     }
 
@@ -85,11 +82,11 @@ mod tests {
     fn test_simple_biome_map_generation() {
         let terrain = TerrainData::create_flat(32, 32, 1.0, 0.0).unwrap();
         let biome_map = BiomeIntegration::generate_simple_biome_map(&terrain, BiomeType::Plains);
-        
+
         assert_eq!(biome_map.width, 32);
         assert_eq!(biome_map.height, 32);
         assert_eq!(biome_map.scale, 1.0);
-        
+
         let blend = biome_map.get_blend_at_grid(16, 16).unwrap();
         assert_eq!(blend.dominant_biome(), Some(BiomeType::Plains));
     }
@@ -97,16 +94,16 @@ mod tests {
     #[test]
     fn test_complex_biome_map_generation() {
         let terrain = TerrainData::create_flat(64, 64, 0.5, 5.0).unwrap();
-        let biome_map = BiomeIntegration::generate_biome_map_for_terrain(&terrain, 12345, Some(4))
-            .unwrap();
-        
+        let biome_map =
+            BiomeIntegration::generate_biome_map_for_terrain(&terrain, 12345, Some(4)).unwrap();
+
         assert_eq!(biome_map.width, 64);
         assert_eq!(biome_map.height, 64);
         assert_eq!(biome_map.scale, 0.5);
-        
+
         // Should have some biome data
         assert!(!biome_map.blends.is_empty());
-        
+
         // Test world coordinate lookup
         let blend = biome_map.get_blend_at_world(0.0, 0.0);
         assert!(blend.is_some());

@@ -1,7 +1,6 @@
 /// Minimal KinematicCharacterController movement example
 /// This demonstrates the absolute bare minimum needed for character movement
 /// Run with: cargo run --example minimal_movement
-
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 
@@ -30,7 +29,11 @@ fn main() {
         .run();
 }
 
-fn setup(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>) {
+fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
     // Camera
     commands.spawn((
         Camera3d::default(),
@@ -86,22 +89,32 @@ fn handle_input(
 ) {
     if mouse_button.just_pressed(MouseButton::Left) {
         let Ok(window) = windows.single() else { return };
-        let Some(cursor_pos) = window.cursor_position() else { return };
-        let Ok((camera, camera_transform)) = camera_query.single() else { return };
-        let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_pos) else { return };
+        let Some(cursor_pos) = window.cursor_position() else {
+            return;
+        };
+        let Ok((camera, camera_transform)) = camera_query.single() else {
+            return;
+        };
+        let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_pos) else {
+            return;
+        };
 
         // Simple ground plane intersection (Y = 0)
         if ray.direction.y != 0.0 {
             let t = -ray.origin.y / ray.direction.y;
             if t > 0.0 {
                 let hit_point = ray.origin + ray.direction * t;
-                
+
                 for (transform, mut player) in player_query.iter_mut() {
                     player.target = Some(hit_point);
-                    println!("Click: New target set to ({:.2}, {:.2}, {:.2})", 
-                             hit_point.x, hit_point.y, hit_point.z);
-                    println!("Player position: ({:.2}, {:.2}, {:.2})", 
-                             transform.translation.x, transform.translation.y, transform.translation.z);
+                    println!(
+                        "Click: New target set to ({:.2}, {:.2}, {:.2})",
+                        hit_point.x, hit_point.y, hit_point.z
+                    );
+                    println!(
+                        "Player position: ({:.2}, {:.2}, {:.2})",
+                        transform.translation.x, transform.translation.y, transform.translation.z
+                    );
                 }
             }
         }
@@ -109,7 +122,11 @@ fn handle_input(
 }
 
 fn move_character(
-    mut query: Query<(&mut Transform, &mut SimplePlayer, &mut KinematicCharacterController)>,
+    mut query: Query<(
+        &mut Transform,
+        &mut SimplePlayer,
+        &mut KinematicCharacterController,
+    )>,
     time: Res<Time>,
 ) {
     for (transform, mut player, mut controller) in query.iter_mut() {
@@ -124,13 +141,20 @@ fn move_character(
                 // Calculate movement
                 let move_distance = player.speed * time.delta_secs();
                 let movement = direction * move_distance.min(distance);
-                
+
                 // Apply movement to controller
                 controller.translation = Some(movement);
-                
-                println!("Movement: direction=({:.2}, {:.2}, {:.2}) distance={:.2} movement=({:.3}, {:.3}, {:.3})",
-                         direction.x, direction.y, direction.z, distance,
-                         movement.x, movement.y, movement.z);
+
+                println!(
+                    "Movement: direction=({:.2}, {:.2}, {:.2}) distance={:.2} movement=({:.3}, {:.3}, {:.3})",
+                    direction.x,
+                    direction.y,
+                    direction.z,
+                    distance,
+                    movement.x,
+                    movement.y,
+                    movement.z
+                );
             } else {
                 // Reached target
                 player.target = None;
@@ -145,22 +169,41 @@ fn move_character(
 }
 
 fn log_state(
-    query: Query<(Entity, &Transform, &SimplePlayer, &KinematicCharacterController, Option<&KinematicCharacterControllerOutput>)>,
+    query: Query<(
+        Entity,
+        &Transform,
+        &SimplePlayer,
+        &KinematicCharacterController,
+        Option<&KinematicCharacterControllerOutput>,
+    )>,
 ) {
     for (entity, transform, player, controller, output) in query.iter() {
         let controller_move = controller.translation.unwrap_or(Vec3::ZERO);
-        
+
         if player.target.is_some() || controller_move.length() > 0.001 {
             let output_str = output
-                .map(|o| format!("effective=({:.3}, {:.3}, {:.3}) grounded={}",
-                    o.effective_translation.x, o.effective_translation.y, o.effective_translation.z, o.grounded))
+                .map(|o| {
+                    format!(
+                        "effective=({:.3}, {:.3}, {:.3}) grounded={}",
+                        o.effective_translation.x,
+                        o.effective_translation.y,
+                        o.effective_translation.z,
+                        o.grounded
+                    )
+                })
                 .unwrap_or_else(|| "None".to_string());
-            
-            println!("State: entity={:?} pos=({:.3}, {:.3}, {:.3}) controller_move=({:.3}, {:.3}, {:.3}) output={}",
-                     entity, 
-                     transform.translation.x, transform.translation.y, transform.translation.z,
-                     controller_move.x, controller_move.y, controller_move.z,
-                     output_str);
+
+            println!(
+                "State: entity={:?} pos=({:.3}, {:.3}, {:.3}) controller_move=({:.3}, {:.3}, {:.3}) output={}",
+                entity,
+                transform.translation.x,
+                transform.translation.y,
+                transform.translation.z,
+                controller_move.x,
+                controller_move.y,
+                controller_move.z,
+                output_str
+            );
         }
     }
 }

@@ -1,5 +1,4 @@
 /// Constants for terrain generation system
-
 /// Default values for path generation
 pub const DEFAULT_MAIN_ROADS: u32 = 3;
 pub const DEFAULT_TRAILS_PER_BIOME: u32 = 2;
