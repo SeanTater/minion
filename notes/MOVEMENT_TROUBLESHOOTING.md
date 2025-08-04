@@ -133,7 +133,7 @@ RUST_LOG=info cargo run 2>&1 | grep -E "(WARNING|ERROR):"
 ### Expected Debug Output
 With debug logging enabled, you should see:
 ```
-INPUT: cursor(400.0, 300.0) camera(...) 
+INPUT: cursor(400.0, 300.0) camera(...)
 TARGET: player_pos(...) final_target(...)
 MOVEMENT: pos(...) target(...) should_move(true) distance(5.2) movement(...)
 CONTROLLER: entity(...) translation(...) slide(true)

@@ -66,11 +66,11 @@ pub fn calculate_movement(
 
     // Calculate movement
     let max_move_distance = config.speed * config.delta_time;
-    
+
     // Apply slowdown as we approach target
     let slowdown_factor = (distance / config.slowdown_distance).min(1.0);
     let actual_move_distance = max_move_distance * slowdown_factor;
-    
+
     // Clamp movement to not overshoot target
     let clamped_move_distance = actual_move_distance.min(distance);
     let movement_vector = direction * clamped_move_distance;
@@ -98,7 +98,7 @@ pub fn calculate_movement(
 /// Validate a target position for movement
 pub fn validate_target(current_position: Vec3, target_position: Vec3) -> bool {
     let distance = current_position.distance(target_position);
-    
+
     // Basic validation rules
     distance > 0.01 && // Must be meaningful distance
     distance < 1000.0 && // Reasonable maximum distance
@@ -112,12 +112,12 @@ pub fn ray_to_ground_target(ray_origin: Vec3, ray_direction: Vec3, ground_y: f32
     if ray_direction.y.abs() < 0.001 {
         return None; // Ray is parallel to ground
     }
-    
+
     let t = (ground_y - ray_origin.y) / ray_direction.y;
     if t < 0.0 {
         return None; // Ray pointing away from ground
     }
-    
+
     let hit_point = ray_origin + ray_direction * t;
     Some(Vec3::new(hit_point.x, ground_y, hit_point.z))
 }
@@ -198,7 +198,7 @@ mod tests {
         let current = Vec3::new(0.0, 1.0, 0.0);
         let target = Vec3::new(0.5, 1.0, 0.0); // Close but outside stopping distance
         let config = MovementConfig {
-            speed: 100.0, // Very high speed
+            speed: 100.0,           // Very high speed
             stopping_distance: 0.1, // Default stopping distance
             ..MovementConfig::default()
         };
@@ -221,9 +221,10 @@ mod tests {
 
         let result = calculate_movement(current, Some(target), config);
 
-        let rotation_target = result.rotation_target
+        let rotation_target = result
+            .rotation_target
             .expect("Rotation target should be calculated for valid movement");
-        
+
         // For GLB models facing backwards, rotation target should be flipped
         assert!(rotation_target.x < current.x); // Flipped X direction
         assert_eq!(rotation_target.y, current.y); // Same Y level
@@ -232,19 +233,22 @@ mod tests {
     #[test]
     fn test_target_validation() {
         let current = Vec3::new(0.0, 1.0, 0.0);
-        
+
         // Valid target
         assert!(validate_target(current, Vec3::new(5.0, 1.0, 3.0)));
-        
+
         // Too close
         assert!(!validate_target(current, Vec3::new(0.005, 1.0, 0.0)));
-        
+
         // Too far
         assert!(!validate_target(current, Vec3::new(2000.0, 1.0, 0.0)));
-        
+
         // Invalid coordinates
         assert!(!validate_target(current, Vec3::new(f32::NAN, 1.0, 0.0)));
-        assert!(!validate_target(current, Vec3::new(5.0, f32::INFINITY, 0.0)));
+        assert!(!validate_target(
+            current,
+            Vec3::new(5.0, f32::INFINITY, 0.0)
+        ));
     }
 
     #[test]
@@ -254,9 +258,8 @@ mod tests {
         let ground_y = 0.0;
 
         let result = ray_to_ground_target(ray_origin, ray_direction, ground_y);
-        
-        let target = result
-            .expect("Ray should hit ground when pointing downward");
+
+        let target = result.expect("Ray should hit ground when pointing downward");
         assert_eq!(target.y, ground_y);
         assert!(target.x > 0.0);
         assert!(target.z > 0.0);
@@ -269,7 +272,7 @@ mod tests {
         let ground_y = 0.0;
 
         let result = ray_to_ground_target(ray_origin, ray_direction, ground_y);
-        
+
         assert!(result.is_none());
     }
 
@@ -280,7 +283,7 @@ mod tests {
         let ground_y = 0.0;
 
         let result = ray_to_ground_target(ray_origin, ray_direction, ground_y);
-        
+
         assert!(result.is_none());
     }
 }

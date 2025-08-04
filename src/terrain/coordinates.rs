@@ -38,7 +38,11 @@ impl WorldCoord {
     /// Convert to grid coordinates
     pub fn to_grid(&self, terrain: &TerrainData) -> Option<GridCoord> {
         let (grid_x, grid_z) = world_to_grid(terrain, self.x, self.z);
-        if grid_x >= 0.0 && grid_z >= 0.0 && grid_x < terrain.width as f32 && grid_z < terrain.height as f32 {
+        if grid_x >= 0.0
+            && grid_z >= 0.0
+            && grid_x < terrain.width as f32
+            && grid_z < terrain.height as f32
+        {
             Some(GridCoord::new(grid_x as u32, grid_z as u32))
         } else {
             None
@@ -77,8 +81,9 @@ pub fn grid_to_world(terrain: &TerrainData, grid_x: f32, grid_z: f32) -> WorldCo
 
 /// Check if grid coordinates are within terrain bounds
 pub fn is_valid_grid(terrain: &TerrainData, grid_x: f32, grid_z: f32) -> bool {
-    grid_x >= 0.0 && grid_z >= 0.0 
-        && grid_x < terrain.width as f32 
+    grid_x >= 0.0
+        && grid_z >= 0.0
+        && grid_x < terrain.width as f32
         && grid_z < terrain.height as f32
 }
 
@@ -97,13 +102,19 @@ pub fn get_height_at_grid_coord(terrain: &TerrainData, coord: GridCoord) -> Opti
 }
 
 /// Get interpolated height at world position using bilinear interpolation
-pub fn get_height_at_world_interpolated(terrain: &TerrainData, world_x: f32, world_z: f32) -> Option<f32> {
+pub fn get_height_at_world_interpolated(
+    terrain: &TerrainData,
+    world_x: f32,
+    world_z: f32,
+) -> Option<f32> {
     let (grid_x, grid_z) = world_to_grid(terrain, world_x, world_z);
 
     // Check bounds (need at least 1 grid cell margin for interpolation)
-    if grid_x < 0.0 || grid_z < 0.0 
-        || grid_x >= (terrain.width - 1) as f32 
-        || grid_z >= (terrain.height - 1) as f32 {
+    if grid_x < 0.0
+        || grid_z < 0.0
+        || grid_x >= (terrain.width - 1) as f32
+        || grid_z >= (terrain.height - 1) as f32
+    {
         return None;
     }
 
@@ -133,7 +144,11 @@ pub fn get_height_at_world_coord(terrain: &TerrainData, world: WorldCoord) -> Op
 }
 
 /// Get height at world position using nearest neighbor (faster, less accurate)
-pub fn get_height_at_world_nearest(terrain: &TerrainData, world_x: f32, world_z: f32) -> Option<f32> {
+pub fn get_height_at_world_nearest(
+    terrain: &TerrainData,
+    world_x: f32,
+    world_z: f32,
+) -> Option<f32> {
     let (grid_x, grid_z) = world_to_grid(terrain, world_x, world_z);
 
     if !is_valid_grid(terrain, grid_x, grid_z) {

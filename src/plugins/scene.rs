@@ -130,7 +130,8 @@ fn follow_camera(
     player_query: Query<&Transform, (With<Player>, Without<CameraFollow>)>,
     mut camera_query: Query<(&mut Transform, &CameraFollow), Without<Player>>,
 ) {
-    let player_transform = player_query.single()
+    let player_transform = player_query
+        .single()
         .expect("Player should always exist when in Playing state");
     for (mut camera_transform, follow) in camera_query.iter_mut() {
         let target_pos = player_transform.translation + follow.offset;

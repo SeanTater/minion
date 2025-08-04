@@ -109,7 +109,8 @@ fn update_hud(
     mut texts: Query<&mut Text, Without<ResourceDisplay>>,
     children_query: Query<&Children>,
 ) {
-    let (player_entity, _player) = player_query.single()
+    let (player_entity, _player) = player_query
+        .single()
         .expect("Player should always exist when in Playing state");
     // Update resource displays to point to the correct player entity and update their children
     for (display_entity, mut display) in resource_displays.iter_mut() {

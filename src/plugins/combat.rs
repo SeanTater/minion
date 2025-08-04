@@ -35,10 +35,12 @@ fn handle_combat_input(
     game_config: Res<GameConfig>,
     mut selected_effect: ResMut<SelectedAreaEffect>,
 ) {
-    let window = windows.single()
+    let window = windows
+        .single()
         .expect("Primary window should always exist when game is running");
     if let Some(cursor_pos) = window.cursor_position() {
-        let (camera, camera_transform) = camera_query.single()
+        let (camera, camera_transform) = camera_query
+            .single()
             .expect("Camera3d should always exist when game is running");
 
         if let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_pos) {
@@ -49,7 +51,8 @@ fn handle_combat_input(
 
                 // Right click: Fire bullet
                 if mouse_button.just_pressed(MouseButton::Right) {
-                    let player_transform = player_query.single()
+                    let player_transform = player_query
+                        .single()
                         .expect("Player should always exist when in Playing state");
                     let direction = (world_pos - player_transform.translation).normalize();
 
@@ -60,9 +63,7 @@ fn handle_combat_input(
                             emissive: Color::srgb(0.5, 0.5, 0.0).into(),
                             ..default()
                         })),
-                        Transform::from_translation(
-                            player_transform.translation + Vec3::Y * 0.5,
-                        ),
+                        Transform::from_translation(player_transform.translation + Vec3::Y * 0.5),
                         Bullet {
                             direction: Vec3::new(direction.x, 0.0, direction.z).normalize(),
                             speed: Speed::new(game_config.settings.bullet_speed),
@@ -85,7 +86,8 @@ fn handle_combat_input(
 
     // Spacebar: Area effect
     if keyboard.just_pressed(KeyCode::Space) {
-        let player_transform = player_query.single()
+        let player_transform = player_query
+            .single()
             .expect("Player should always exist when in Playing state");
         let effect_type = selected_effect.effect_type;
         commands.spawn((

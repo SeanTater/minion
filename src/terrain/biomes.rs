@@ -28,11 +28,11 @@ pub enum SurfaceType {
 /// Rock size categories for realistic distribution
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum RockSize {
-    Pebbles,    // 0.1-0.3m
-    SmallRocks, // 0.3-0.8m
-    MediumRocks,// 0.8-1.5m
-    LargeRocks, // 1.5-3.0m
-    Boulders,   // 3.0m+
+    Pebbles,     // 0.1-0.3m
+    SmallRocks,  // 0.3-0.8m
+    MediumRocks, // 0.8-1.5m
+    LargeRocks,  // 1.5-3.0m
+    Boulders,    // 3.0m+
 }
 
 /// Biome configuration defining characteristics and generation parameters
@@ -42,10 +42,10 @@ pub struct BiomeConfig {
     pub biome_type: BiomeType,
     pub primary_surface: SurfaceType,
     pub secondary_surfaces: Vec<(SurfaceType, f32)>, // (surface, probability)
-    pub elevation_preference: (f32, f32), // (min, max) normalized height
-    pub slope_tolerance: f32, // Maximum slope this biome tolerates
-    pub temperature: f32, // -1.0 (cold) to 1.0 (hot)
-    pub humidity: f32,    // -1.0 (dry) to 1.0 (wet)
+    pub elevation_preference: (f32, f32),            // (min, max) normalized height
+    pub slope_tolerance: f32,                        // Maximum slope this biome tolerates
+    pub temperature: f32,                            // -1.0 (cold) to 1.0 (hot)
+    pub humidity: f32,                               // -1.0 (dry) to 1.0 (wet)
 }
 
 /// Weighted biome influence at a specific location
@@ -60,14 +60,14 @@ pub struct BiomeMap {
     pub width: u32,
     pub height: u32,
     pub blends: Vec<BiomeBlend>, // Flattened 2D array (row-major)
-    pub scale: f32, // World units per grid cell (matches TerrainData)
+    pub scale: f32,              // World units per grid cell (matches TerrainData)
 }
 
 /// Combined biome data including discrete map and smooth blends
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BiomeData {
     pub biome_map: Vec<Vec<BiomeType>>, // Discrete biome assignment for pathfinding
-    pub blend_map: BiomeMap, // Smooth biome blends for rendering
+    pub blend_map: BiomeMap,            // Smooth biome blends for rendering
 }
 
 impl BiomeConfig {
@@ -101,8 +101,9 @@ impl BiomeConfig {
 
     /// Check if this biome is suitable for given elevation and slope
     pub fn is_suitable(&self, elevation: f32, slope: f32) -> f32 {
-        let elevation_score = if elevation >= self.elevation_preference.0 
-            && elevation <= self.elevation_preference.1 {
+        let elevation_score = if elevation >= self.elevation_preference.0
+            && elevation <= self.elevation_preference.1
+        {
             1.0
         } else {
             let distance = if elevation < self.elevation_preference.0 {
@@ -135,7 +136,7 @@ impl BiomeBlend {
     pub fn from_weights(mut weights: Vec<(BiomeType, f32)>) -> Self {
         // Remove zero weights
         weights.retain(|(_, weight)| *weight > 0.0);
-        
+
         // Normalize weights to sum to 1.0
         let total: f32 = weights.iter().map(|(_, w)| *w).sum();
         if total > 0.0 {
@@ -171,7 +172,7 @@ impl BiomeMap {
     pub fn uniform(width: u32, height: u32, biome_type: BiomeType, scale: f32) -> Self {
         let blend = BiomeBlend::single(biome_type);
         let blends = vec![blend; (width * height) as usize];
-        
+
         Self {
             width,
             height,
@@ -194,14 +195,14 @@ impl BiomeMap {
         // Convert world coordinates to grid coordinates (centered)
         let half_width = (self.width as f32 * self.scale) / 2.0;
         let half_height = (self.height as f32 * self.scale) / 2.0;
-        
+
         let grid_x = ((world_x + half_width) / self.scale).floor() as i32;
         let grid_z = ((world_z + half_height) / self.scale).floor() as i32;
-        
+
         if grid_x < 0 || grid_z < 0 || grid_x >= self.width as i32 || grid_z >= self.height as i32 {
             return None;
         }
-        
+
         self.get_blend_at_grid(grid_x as u32, grid_z as u32)
     }
 }
@@ -217,12 +218,12 @@ pub fn create_default_biomes() -> HashMap<BiomeType, BiomeConfig> {
             BiomeType::Plains,
             SurfaceType::Grass,
             (0.0, 0.3), // Low to moderate elevation
-            0.3, // Gentle slopes
-            0.1, // Mild temperature
-            0.2, // Moderate humidity
+            0.3,        // Gentle slopes
+            0.1,        // Mild temperature
+            0.2,        // Moderate humidity
         )
         .with_secondary_surface(SurfaceType::Dirt, 0.2)
-        .with_secondary_surface(SurfaceType::Rock(RockSize::SmallRocks), 0.1)
+        .with_secondary_surface(SurfaceType::Rock(RockSize::SmallRocks), 0.1),
     );
 
     biomes.insert(
@@ -232,12 +233,12 @@ pub fn create_default_biomes() -> HashMap<BiomeType, BiomeConfig> {
             BiomeType::Forest,
             SurfaceType::Dirt,
             (0.1, 0.6), // Low to high elevation
-            0.5, // Moderate slopes
-            0.0, // Cool temperature
-            0.5, // High humidity
+            0.5,        // Moderate slopes
+            0.0,        // Cool temperature
+            0.5,        // High humidity
         )
         .with_secondary_surface(SurfaceType::Grass, 0.3)
-        .with_secondary_surface(SurfaceType::Rock(RockSize::MediumRocks), 0.15)
+        .with_secondary_surface(SurfaceType::Rock(RockSize::MediumRocks), 0.15),
     );
 
     biomes.insert(
@@ -247,12 +248,12 @@ pub fn create_default_biomes() -> HashMap<BiomeType, BiomeConfig> {
             BiomeType::Mountains,
             SurfaceType::Rock(RockSize::LargeRocks),
             (0.4, 1.0), // High elevation
-            1.0, // Steep slopes OK
-            -0.3, // Cold temperature
-            -0.2, // Low humidity
+            1.0,        // Steep slopes OK
+            -0.3,       // Cold temperature
+            -0.2,       // Low humidity
         )
         .with_secondary_surface(SurfaceType::Rock(RockSize::Boulders), 0.3)
-        .with_secondary_surface(SurfaceType::Ice, 0.2)
+        .with_secondary_surface(SurfaceType::Ice, 0.2),
     );
 
     biomes.insert(
@@ -262,12 +263,12 @@ pub fn create_default_biomes() -> HashMap<BiomeType, BiomeConfig> {
             BiomeType::Desert,
             SurfaceType::Sand,
             (0.0, 0.4), // Low to moderate elevation
-            0.4, // Moderate slopes
-            0.7, // Hot temperature
-            -0.8, // Very dry
+            0.4,        // Moderate slopes
+            0.7,        // Hot temperature
+            -0.8,       // Very dry
         )
         .with_secondary_surface(SurfaceType::Rock(RockSize::MediumRocks), 0.2)
-        .with_secondary_surface(SurfaceType::Dirt, 0.1)
+        .with_secondary_surface(SurfaceType::Dirt, 0.1),
     );
 
     biomes.insert(
@@ -277,12 +278,12 @@ pub fn create_default_biomes() -> HashMap<BiomeType, BiomeConfig> {
             BiomeType::Swamp,
             SurfaceType::Water,
             (-0.1, 0.2), // Low elevation (near water level)
-            0.2, // Very gentle slopes
-            0.3, // Warm temperature
-            0.9, // Very humid
+            0.2,         // Very gentle slopes
+            0.3,         // Warm temperature
+            0.9,         // Very humid
         )
         .with_secondary_surface(SurfaceType::Dirt, 0.4)
-        .with_secondary_surface(SurfaceType::Grass, 0.2)
+        .with_secondary_surface(SurfaceType::Grass, 0.2),
     );
 
     biomes.insert(
@@ -292,12 +293,12 @@ pub fn create_default_biomes() -> HashMap<BiomeType, BiomeConfig> {
             BiomeType::Tundra,
             SurfaceType::Ice,
             (0.2, 0.8), // Moderate to high elevation
-            0.3, // Gentle slopes
-            -0.8, // Very cold
-            -0.3, // Low humidity
+            0.3,        // Gentle slopes
+            -0.8,       // Very cold
+            -0.3,       // Low humidity
         )
         .with_secondary_surface(SurfaceType::Rock(RockSize::Boulders), 0.3)
-        .with_secondary_surface(SurfaceType::Dirt, 0.1)
+        .with_secondary_surface(SurfaceType::Dirt, 0.1),
     );
 
     biomes.insert(
@@ -307,11 +308,11 @@ pub fn create_default_biomes() -> HashMap<BiomeType, BiomeConfig> {
             BiomeType::Ocean,
             SurfaceType::Water,
             (-1.0, 0.0), // Below sea level
-            0.1, // Very flat
-            0.2, // Moderate temperature
-            1.0, // Maximum humidity
+            0.1,         // Very flat
+            0.2,         // Moderate temperature
+            1.0,         // Maximum humidity
         )
-        .with_secondary_surface(SurfaceType::Sand, 0.2)
+        .with_secondary_surface(SurfaceType::Sand, 0.2),
     );
 
     biomes
@@ -331,12 +332,9 @@ mod tests {
 
     #[test]
     fn test_biome_blend_normalization() {
-        let weights = vec![
-            (BiomeType::Forest, 3.0),
-            (BiomeType::Plains, 1.0),
-        ];
+        let weights = vec![(BiomeType::Forest, 3.0), (BiomeType::Plains, 1.0)];
         let blend = BiomeBlend::from_weights(weights);
-        
+
         assert_eq!(blend.get_weight(BiomeType::Forest), 0.75);
         assert_eq!(blend.get_weight(BiomeType::Plains), 0.25);
     }
@@ -347,7 +345,7 @@ mod tests {
         assert_eq!(map.width, 10);
         assert_eq!(map.height, 10);
         assert_eq!(map.blends.len(), 100);
-        
+
         let blend = map.get_blend_at_grid(5, 5).unwrap();
         assert_eq!(blend.dominant_biome(), Some(BiomeType::Plains));
     }
@@ -366,10 +364,10 @@ mod tests {
 
         // Perfect conditions
         assert_eq!(config.is_suitable(0.5, 0.1), 1.0);
-        
+
         // Outside elevation range
         assert!(config.is_suitable(1.0, 0.1) < 1.0);
-        
+
         // Too steep
         assert!(config.is_suitable(0.5, 0.8) < 1.0);
     }

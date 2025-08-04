@@ -103,9 +103,11 @@ fn position_tooltips(
     camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     windows: Query<&Window>,
 ) {
-    let (camera, camera_transform) = camera_query.single()
+    let (camera, camera_transform) = camera_query
+        .single()
         .expect("Camera3d should always exist when game is running");
-    let _window = windows.single()
+    let _window = windows
+        .single()
         .expect("Primary window should always exist when game is running");
 
     for (mut tooltip_node, enemy_tooltip) in tooltip_query.iter_mut() {

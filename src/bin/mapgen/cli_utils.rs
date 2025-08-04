@@ -113,9 +113,15 @@ mod tests {
 
     #[test]
     fn test_parse_position() {
-        assert_eq!(parse_position("0.0,1.0,0.0").unwrap(), Vec3::new(0.0, 1.0, 0.0));
-        assert_eq!(parse_position("-5.5,2.3,10.1").unwrap(), Vec3::new(-5.5, 2.3, 10.1));
-        
+        assert_eq!(
+            parse_position("0.0,1.0,0.0").unwrap(),
+            Vec3::new(0.0, 1.0, 0.0)
+        );
+        assert_eq!(
+            parse_position("-5.5,2.3,10.1").unwrap(),
+            Vec3::new(-5.5, 2.3, 10.1)
+        );
+
         assert!(parse_position("0.0,1.0").is_err());
         assert!(parse_position("abc,def,ghi").is_err());
     }
@@ -124,7 +130,7 @@ mod tests {
     fn test_parse_scale_range() {
         assert_eq!(parse_scale_range("0.8,1.2").unwrap(), (0.8, 1.2));
         assert_eq!(parse_scale_range("1.0,1.0").unwrap(), (1.0, 1.0));
-        
+
         assert!(parse_scale_range("0.8").is_err());
         assert!(parse_scale_range("0.0,1.2").is_err());
         assert!(parse_scale_range("1.2,0.8").is_err());
@@ -133,7 +139,10 @@ mod tests {
     #[test]
     fn test_parse_object_types() {
         assert_eq!(parse_object_types("tree,rock"), vec!["tree", "rock"]);
-        assert_eq!(parse_object_types("tree, rock, grass"), vec!["tree", "rock", "grass"]);
+        assert_eq!(
+            parse_object_types("tree, rock, grass"),
+            vec!["tree", "rock", "grass"]
+        );
         assert_eq!(parse_object_types(""), Vec::<String>::new());
     }
 

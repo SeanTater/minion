@@ -154,7 +154,7 @@ if distance > far_threshold {
 pub struct GameConfig {
     #[validate(range(min = 1.0, max = 20.0))]
     player_speed: f32,
-    
+
     #[validate(range(min = 1, max = 100))]
     max_enemies: u32,
 }
@@ -183,7 +183,7 @@ pub struct GameConfig {
 pub enum MinionError {
     #[error("Invalid map data: {reason}")]
     InvalidMapData { reason: String },
-    
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 }

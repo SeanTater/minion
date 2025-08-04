@@ -106,7 +106,7 @@ impl MapDefinition {
                 })
                 .collect::<Vec<String>>()
                 .join("; ");
-            
+
             MinionError::MapValidationFailed {
                 reason: format!("Map validation failed: {error_details}"),
             }
@@ -149,7 +149,11 @@ impl MapDefinition {
 
     /// Get interpolated height at world position
     pub fn get_height_at_world(&self, world_x: f32, world_z: f32) -> Option<f32> {
-        crate::terrain::coordinates::get_height_at_world_interpolated(&self.terrain, world_x, world_z)
+        crate::terrain::coordinates::get_height_at_world_interpolated(
+            &self.terrain,
+            world_x,
+            world_z,
+        )
     }
 }
 
