@@ -5,20 +5,6 @@ use crate::resources::{GameConfig, GameSettings, GameState};
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPlugin, EguiPrimaryContextPass, egui};
 
-/// Macro to create sliders for range-safe types
-macro_rules! range_safe_slider {
-    ($ui:expr, $value:expr, $range:expr, $text:expr, $suffix:expr, $type:ty) => {{
-        let mut temp_value = $value.get();
-        let response = $ui.add(
-            egui::Slider::new(&mut temp_value, $range)
-                .text($text)
-                .suffix($suffix),
-        );
-        *$value = <$type>::new(temp_value);
-        response
-    }};
-}
-
 pub struct EguiUiPlugin;
 
 impl Plugin for EguiUiPlugin {
@@ -232,38 +218,50 @@ fn settings_egui_system(
                                         );
                                         ui.add_space(10.0);
 
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.player_movement_speed,
-                                            1.0..=10.0,
-                                            "Movement Speed",
-                                            " units/s",
-                                            MovementSpeed
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.player_max_health,
-                                            10.0..=200.0,
-                                            "Max Health",
-                                            " HP",
-                                            HealthValue
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.player_max_mana,
-                                            10.0..=100.0,
-                                            "Max Mana",
-                                            " MP",
-                                            ManaValue
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.player_max_energy,
-                                            10.0..=200.0,
-                                            "Max Energy",
-                                            " EN",
-                                            EnergyValue
-                                        );
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.player_movement_speed.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 1.0..=10.0)
+                                                    .text("Movement Speed")
+                                                    .suffix(" units/s"),
+                                            );
+                                            game_config.settings.player_movement_speed =
+                                                MovementSpeed::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.player_max_health.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 10.0..=200.0)
+                                                    .text("Max Health")
+                                                    .suffix(" HP"),
+                                            );
+                                            game_config.settings.player_max_health =
+                                                HealthValue::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.player_max_mana.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 10.0..=100.0)
+                                                    .text("Max Mana")
+                                                    .suffix(" MP"),
+                                            );
+                                            game_config.settings.player_max_mana =
+                                                ManaValue::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.player_max_energy.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 10.0..=200.0)
+                                                    .text("Max Energy")
+                                                    .suffix(" EN"),
+                                            );
+                                            game_config.settings.player_max_energy =
+                                                EnergyValue::new(temp_value);
+                                        }
                                     });
 
                                     ui.add_space(20.0);
@@ -276,78 +274,105 @@ fn settings_egui_system(
                                     )
                                     .default_open(true)
                                     .show(ui, |ui| {
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.bullet_speed,
-                                            5.0..=30.0,
-                                            "Bullet Speed",
-                                            " units/s",
-                                            BulletSpeed
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.bullet_damage,
-                                            0.5..=10.0,
-                                            "Bullet Damage",
-                                            " DMG",
-                                            BulletDamage
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.bullet_lifetime,
-                                            1.0..=8.0,
-                                            "Bullet Lifetime",
-                                            " s",
-                                            Lifetime
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.magic_damage_per_second,
-                                            50.0..=500.0,
-                                            "Magic DPS",
-                                            " DMG/s",
-                                            DamagePerSecond
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.poison_damage_per_second,
-                                            20.0..=300.0,
-                                            "Poison DPS",
-                                            " DMG/s",
-                                            DamagePerSecond
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.magic_area_radius,
-                                            1.0..=8.0,
-                                            "Magic Radius",
-                                            " units",
-                                            AreaRadius
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.poison_area_radius,
-                                            1.0..=10.0,
-                                            "Poison Radius",
-                                            " units",
-                                            AreaRadius
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.magic_area_duration,
-                                            0.5..=10.0,
-                                            "Magic Duration",
-                                            " s",
-                                            AreaDuration
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.poison_area_duration,
-                                            0.5..=15.0,
-                                            "Poison Duration",
-                                            " s",
-                                            AreaDuration
-                                        );
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.bullet_speed.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 5.0..=30.0)
+                                                    .text("Bullet Speed")
+                                                    .suffix(" units/s"),
+                                            );
+                                            game_config.settings.bullet_speed =
+                                                BulletSpeed::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.bullet_damage.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 0.5..=10.0)
+                                                    .text("Bullet Damage")
+                                                    .suffix(" DMG"),
+                                            );
+                                            game_config.settings.bullet_damage =
+                                                BulletDamage::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.bullet_lifetime.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 1.0..=8.0)
+                                                    .text("Bullet Lifetime")
+                                                    .suffix(" s"),
+                                            );
+                                            game_config.settings.bullet_lifetime =
+                                                Lifetime::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.magic_damage_per_second.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 50.0..=500.0)
+                                                    .text("Magic DPS")
+                                                    .suffix(" DMG/s"),
+                                            );
+                                            game_config.settings.magic_damage_per_second =
+                                                DamagePerSecond::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.poison_damage_per_second.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 20.0..=300.0)
+                                                    .text("Poison DPS")
+                                                    .suffix(" DMG/s"),
+                                            );
+                                            game_config.settings.poison_damage_per_second =
+                                                DamagePerSecond::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.magic_area_radius.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 1.0..=8.0)
+                                                    .text("Magic Radius")
+                                                    .suffix(" units"),
+                                            );
+                                            game_config.settings.magic_area_radius =
+                                                AreaRadius::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.poison_area_radius.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 1.0..=10.0)
+                                                    .text("Poison Radius")
+                                                    .suffix(" units"),
+                                            );
+                                            game_config.settings.poison_area_radius =
+                                                AreaRadius::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.magic_area_duration.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 0.5..=10.0)
+                                                    .text("Magic Duration")
+                                                    .suffix(" s"),
+                                            );
+                                            game_config.settings.magic_area_duration =
+                                                AreaDuration::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.poison_area_duration.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 0.5..=15.0)
+                                                    .text("Poison Duration")
+                                                    .suffix(" s"),
+                                            );
+                                            game_config.settings.poison_area_duration =
+                                                AreaDuration::new(temp_value);
+                                        }
                                     });
                                 },
                             );
@@ -366,78 +391,107 @@ fn settings_egui_system(
                                     )
                                     .default_open(true)
                                     .show(ui, |ui| {
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.enemy_movement_speed,
-                                            1.0..=8.0,
-                                            "Movement Speed",
-                                            " units/s",
-                                            MovementSpeed
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.enemy_max_health,
-                                            1.0..=20.0,
-                                            "Max Health",
-                                            " HP",
-                                            HealthValue
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.enemy_max_mana,
-                                            5.0..=50.0,
-                                            "Max Mana",
-                                            " MP",
-                                            ManaValue
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.enemy_max_energy,
-                                            10.0..=100.0,
-                                            "Max Energy",
-                                            " EN",
-                                            EnergyValue
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.enemy_chase_distance,
-                                            3.0..=15.0,
-                                            "Chase Distance",
-                                            " units",
-                                            ChaseDistance
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.enemy_collision_distance,
-                                            0.5..=3.0,
-                                            "Collision Distance",
-                                            " units",
-                                            CollisionDistance
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.bullet_collision_distance,
-                                            0.2..=2.0,
-                                            "Bullet Collision Distance",
-                                            " units",
-                                            CollisionDistance
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.enemy_spawn_distance_min,
-                                            2.0..=10.0,
-                                            "Min Spawn Distance",
-                                            " units",
-                                            SpawnDistanceMin
-                                        );
-                                        range_safe_slider!(
-                                            ui,
-                                            &mut game_config.settings.enemy_spawn_distance_max,
-                                            8.0..=25.0,
-                                            "Max Spawn Distance",
-                                            " units",
-                                            SpawnDistanceMax
-                                        );
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.enemy_movement_speed.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 1.0..=8.0)
+                                                    .text("Movement Speed")
+                                                    .suffix(" units/s"),
+                                            );
+                                            game_config.settings.enemy_movement_speed =
+                                                MovementSpeed::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.enemy_max_health.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 1.0..=20.0)
+                                                    .text("Max Health")
+                                                    .suffix(" HP"),
+                                            );
+                                            game_config.settings.enemy_max_health =
+                                                HealthValue::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.enemy_max_mana.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 5.0..=50.0)
+                                                    .text("Max Mana")
+                                                    .suffix(" MP"),
+                                            );
+                                            game_config.settings.enemy_max_mana =
+                                                ManaValue::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.enemy_max_energy.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 10.0..=100.0)
+                                                    .text("Max Energy")
+                                                    .suffix(" EN"),
+                                            );
+                                            game_config.settings.enemy_max_energy =
+                                                EnergyValue::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.enemy_chase_distance.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 3.0..=15.0)
+                                                    .text("Chase Distance")
+                                                    .suffix(" units"),
+                                            );
+                                            game_config.settings.enemy_chase_distance =
+                                                ChaseDistance::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.enemy_collision_distance.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 0.5..=3.0)
+                                                    .text("Collision Distance")
+                                                    .suffix(" units"),
+                                            );
+                                            game_config.settings.enemy_collision_distance =
+                                                CollisionDistance::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value = game_config
+                                                .settings
+                                                .bullet_collision_distance
+                                                .get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 0.2..=2.0)
+                                                    .text("Bullet Collision Distance")
+                                                    .suffix(" units"),
+                                            );
+                                            game_config.settings.bullet_collision_distance =
+                                                CollisionDistance::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.enemy_spawn_distance_min.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 2.0..=10.0)
+                                                    .text("Min Spawn Distance")
+                                                    .suffix(" units"),
+                                            );
+                                            game_config.settings.enemy_spawn_distance_min =
+                                                SpawnDistanceMin::new(temp_value);
+                                        }
+                                        {
+                                            let mut temp_value =
+                                                game_config.settings.enemy_spawn_distance_max.get();
+                                            ui.add(
+                                                egui::Slider::new(&mut temp_value, 8.0..=25.0)
+                                                    .text("Max Spawn Distance")
+                                                    .suffix(" units"),
+                                            );
+                                            game_config.settings.enemy_spawn_distance_max =
+                                                SpawnDistanceMax::new(temp_value);
+                                        }
                                         ui.add(
                                             egui::Slider::new(
                                                 &mut game_config.settings.score_per_enemy,

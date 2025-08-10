@@ -154,7 +154,7 @@ fn handle_player_input(
         let has_window = !windows.is_empty();
         let has_camera = !camera_query.is_empty();
 
-        let window = match windows.get_single() {
+        let window = match windows.single() {
             Ok(w) => w,
             Err(_) => {
                 warn!("Input validation failed: Primary window not found");
@@ -175,7 +175,7 @@ fn handle_player_input(
         // Safe to unwrap after validation
         let cursor_pos = cursor_pos.unwrap();
 
-        let (camera, camera_transform) = match camera_query.get_single() {
+        let (camera, camera_transform) = match camera_query.single() {
             Ok(result) => result,
             Err(_) => {
                 warn!("Could not get camera after validation");
