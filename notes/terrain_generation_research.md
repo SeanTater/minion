@@ -4,7 +4,7 @@
 
 ### Existing Implementation
 - **Single Noise Algorithms**: Perlin, Ridged with basic parameters
-- **Fixed Terrain Types**: flat, hills, mountains, valleys 
+- **Fixed Terrain Types**: flat, hills, mountains, valleys
 - **TerrainData Structure**: heightmaps with scale parameter for vertex density
 - **Environment Objects**: simple placement (trees, rocks)
 - **Scale**: configurable from 0.1-100.0 world units per grid cell

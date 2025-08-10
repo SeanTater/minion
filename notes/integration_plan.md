@@ -182,12 +182,12 @@ pub fn generate_biome_terrain_collider(
     // 2. Apply surface-type specific physics properties
     // 3. Generate separate colliders for different material zones
     // 4. Combine using compound collider for efficiency
-    
+
     let base_collider = generate_terrain_collider(&biome_terrain.base)?;
-    
+
     // Add material-specific collision properties
     let mut compound_collider_data = Vec::new();
-    
+
     // Water zones - sensor colliders for swimming detection
     for water_zone in find_water_zones(biome_terrain) {
         let water_collider = generate_zone_collider(water_zone)?;
@@ -196,7 +196,7 @@ pub fn generate_biome_terrain_collider(
             water_collider.with_sensor(true)
         ));
     }
-    
+
     // Ice zones - low friction colliders
     for ice_zone in find_ice_zones(biome_terrain) {
         let ice_collider = generate_zone_collider(ice_zone)?;
@@ -205,7 +205,7 @@ pub fn generate_biome_terrain_collider(
             ice_collider.with_friction(0.1)
         ));
     }
-    
+
     Ok(Collider::compound(compound_collider_data))
 }
 ```
@@ -222,7 +222,7 @@ pub fn generate_path_colliders(
         let collider = Collider::capsule_y(0.1, path.width / 2.0)
             .with_friction(0.3)
             .with_restitution(0.0);
-        
+
         (path.transform, collider)
     }).collect()
 }
@@ -268,37 +268,37 @@ pub struct BiomePhysicsMaterials {
 impl Default for BiomePhysicsMaterials {
     fn default() -> Self {
         let mut materials = HashMap::new();
-        
+
         materials.insert(SurfaceType::Grass, PhysicsMaterial {
             friction: 0.7,
             restitution: 0.1,
             ..default()
         });
-        
+
         materials.insert(SurfaceType::Rock(_), PhysicsMaterial {
             friction: 0.9,
             restitution: 0.3,
             ..default()
         });
-        
+
         materials.insert(SurfaceType::Ice, PhysicsMaterial {
             friction: 0.1,
             restitution: 0.0,
             ..default()
         });
-        
+
         materials.insert(SurfaceType::Sand, PhysicsMaterial {
             friction: 0.8,
             restitution: 0.05,
             ..default()
         });
-        
+
         materials.insert(SurfaceType::Water, PhysicsMaterial {
             friction: 0.0,
             restitution: 0.0,
             ..default()
         });
-        
+
         Self { materials }
     }
 }
@@ -314,7 +314,7 @@ pub fn biome_movement_system(
     for (mut force, transform) in player_query.iter_mut() {
         // Query surface type at player position
         if let Some(surface_type) = get_surface_at_position(
-            &biome_terrain, 
+            &biome_terrain,
             transform.translation.xz()
         ) {
             // Apply surface-specific movement modifiers
@@ -353,14 +353,14 @@ pub fn setup_biome_terrain_materials(
     asset_server: Res<AssetServer>,
 ) {
     let mut biome_materials = HashMap::new();
-    
+
     // Load texture arrays for each surface type
     biome_materials.insert(SurfaceType::Grass, materials.add(StandardMaterial {
         base_color_texture: Some(asset_server.load("textures/grass_diffuse.png")),
         normal_map_texture: Some(asset_server.load("textures/grass_normal.png")),
         ..default()
     }));
-    
+
     biome_materials.insert(SurfaceType::Rock(RockSize::MediumRocks), materials.add(StandardMaterial {
         base_color_texture: Some(asset_server.load("textures/rock_diffuse.png")),
         normal_map_texture: Some(asset_server.load("textures/rock_normal.png")),
@@ -368,9 +368,9 @@ pub fn setup_biome_terrain_materials(
         roughness: 0.9,
         ..default()
     }));
-    
+
     // Additional materials...
-    
+
     commands.insert_resource(BiomeAssets {
         materials: biome_materials,
         ..default()
@@ -401,7 +401,7 @@ impl BiomeSpatialIndex {
         // O(1) biome lookup using spatial grid
         // Cache blend weights for frequently queried cells
     }
-    
+
     pub fn query_objects_in_radius(&self, center: Vec2, radius: f32) -> Vec<Entity> {
         // Efficient object queries for gameplay systems
         // Use spatial hashing for collision detection

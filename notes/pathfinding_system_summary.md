@@ -37,7 +37,7 @@ pub struct PathfindingAgent {
 - Click-to-move sets `agent.destination` instead of `player.move_target`
 - Existing movement validation logic remains unchanged
 
-### Enemy Integration  
+### Enemy Integration
 - Replace direct chase movement with pathfinding destinations
 - AI sets `agent.destination = Some(player_pos)` when chasing
 - Maintains existing flocking/separation forces through physics system
@@ -82,7 +82,7 @@ pub fn follow_paths(
 
 ### Computational Costs
 - **64x64 grid**: <5ms pathfinding, 4KB memory
-- **128x128 grid**: <15ms pathfinding, 16KB memory  
+- **128x128 grid**: <15ms pathfinding, 16KB memory
 - **256x256 grid**: <50ms pathfinding, 64KB memory
 
 ### Optimization Strategies
@@ -95,7 +95,7 @@ pub fn follow_paths(
 
 ### Automatic Replanning Triggers
 - **Time-based**: Every 2-3 seconds for active agents
-- **Path age**: Paths older than 10 seconds  
+- **Path age**: Paths older than 10 seconds
 - **Obstacle detection**: Dynamic obstacles blocking upcoming waypoints
 - **Stuck detection**: Agent hasn't moved in X seconds
 - **Destination changes**: New target assigned
@@ -115,7 +115,7 @@ fn is_path_blocked(path: &NavPath, obstacles: &Query<&Transform>) -> bool {
 - Movement calculations with pathfinding waypoints
 - Grid generation from terrain data
 
-### Integration Tests  
+### Integration Tests
 - Player pathfinding with mouse input
 - Enemy AI pathfinding behavior
 - Path following with physics system
@@ -129,7 +129,7 @@ fn is_path_blocked(path: &NavPath, obstacles: &Query<&Transform>) -> bool {
 
 ### Phase 1: Core System (1-2 days)
 1. Create `PathfindingAgent` component
-2. Implement `NavigationGrid` with basic A* 
+2. Implement `NavigationGrid` with basic A*
 3. Create `find_paths` and `follow_paths` systems
 4. Basic terrain integration
 
@@ -156,7 +156,7 @@ fn is_path_blocked(path: &NavPath, obstacles: &Query<&Transform>) -> bool {
 ```
 src/pathfinding/
 ├── mod.rs              # Plugin and public API
-├── components.rs       # PathfindingAgent, NavigationGrid  
+├── components.rs       # PathfindingAgent, NavigationGrid
 ├── navigation.rs       # Core A* implementation
 ├── systems.rs          # find_paths, follow_paths systems
 └── tests.rs           # Unit tests
