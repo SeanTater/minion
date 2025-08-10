@@ -96,21 +96,21 @@ impl NavigationGrid {
     pub fn world_to_grid(&self, world_pos: Vec3) -> Option<(u32, u32)> {
         let rel_x = world_pos.x - self.origin.x;
         let rel_z = world_pos.z - self.origin.z;
-        
+
         if rel_x < 0.0 || rel_z < 0.0 {
             return None;
         }
-        
+
         let grid_x = (rel_x / self.cell_size) as u32;
         let grid_z = (rel_z / self.cell_size) as u32;
-        
+
         if grid_x >= self.width || grid_z >= self.height {
             None
         } else {
             Some((grid_x, grid_z))
         }
     }
-    
+
     pub fn grid_to_world(&self, grid_x: u32, grid_z: u32) -> Vec3 {
         Vec3::new(
             self.origin.x + (grid_x as f32 + 0.5) * self.cell_size,
@@ -118,7 +118,7 @@ impl NavigationGrid {
             self.origin.z + (grid_z as f32 + 0.5) * self.cell_size,
         )
     }
-    
+
     pub fn is_walkable(&self, grid_x: u32, grid_z: u32) -> bool {
         if grid_x >= self.width || grid_z >= self.height {
             return false;
@@ -126,41 +126,41 @@ impl NavigationGrid {
         let index = (grid_z * self.width + grid_x) as usize;
         self.walkable.get(index).copied().unwrap_or(false)
     }
-    
+
     pub fn find_path(&self, start: Vec3, end: Vec3) -> Option<Vec<Vec3>> {
         let start_grid = self.world_to_grid(start)?;
         let end_grid = self.world_to_grid(end)?;
-        
+
         let result = astar(
             &start_grid,
             |&(x, z)| self.get_neighbors(x, z),
             |&(x, z)| self.heuristic((x, z), end_grid),
             |&pos| pos == end_grid,
         );
-        
+
         result.map(|(path, _cost)| {
             path.into_iter()
                 .map(|(x, z)| self.grid_to_world(x, z))
                 .collect()
         })
     }
-    
+
     fn get_neighbors(&self, x: u32, z: u32) -> Vec<((u32, u32), u32)> {
         let mut neighbors = Vec::new();
         let directions = [(-1, 0), (1, 0), (0, -1), (0, 1)];
-        
+
         for (dx, dz) in directions {
             let new_x = (x as i32 + dx) as u32;
             let new_z = (z as i32 + dz) as u32;
-            
+
             if self.is_walkable(new_x, new_z) {
                 neighbors.push(((new_x, new_z), 10));
             }
         }
-        
+
         neighbors
     }
-    
+
     fn heuristic(&self, pos: (u32, u32), goal: (u32, u32)) -> u32 {
         let dx = (pos.0 as i32 - goal.0 as i32).abs() as u32;
         let dz = (pos.1 as i32 - goal.1 as i32).abs() as u32;
@@ -200,8 +200,8 @@ pub fn find_paths(
 
 pub fn follow_paths(
     mut agents: Query<(
-        &Transform, 
-        &mut PathfindingAgent, 
+        &Transform,
+        &mut PathfindingAgent,
         &mut KinematicCharacterController
     )>,
     time: Res<Time>,
@@ -210,20 +210,20 @@ pub fn follow_paths(
         if let Some(ref path) = agent.current_path {
             if agent.current_waypoint < path.len() {
                 let target_waypoint = path[agent.current_waypoint];
-                
+
                 let config = MovementConfig {
                     speed: agent.max_speed,
                     stopping_distance: agent.stopping_distance,
                     slowdown_distance: 2.0,
                     delta_time: time.delta_secs(),
                 };
-                
+
                 let movement = calculate_movement(
                     transform.translation,
                     Some(target_waypoint),
                     config,
                 );
-                
+
                 if movement.should_move {
                     // Apply movement through existing physics system
                     let movement_with_gravity = Vec3::new(
@@ -232,7 +232,7 @@ pub fn follow_paths(
                         movement.movement_vector.z,
                     );
                     controller.translation = Some(movement_with_gravity);
-                    
+
                     // Handle rotation using existing logic
                     if let Some(rotation_target) = movement.rotation_target {
                         // This will be handled by the existing transform system
@@ -278,13 +278,13 @@ fn handle_player_input(
 ) {
     if mouse_button.just_pressed(MouseButton::Left) {
         // ... existing ray casting code
-        
+
         for mut agent in player_query.iter_mut() {
             if let Some(target) = ray_to_ground_target(ray.origin, *ray.direction, player_y) {
                 if validate_target(player_transform.translation, target) {
                     agent.destination = Some(target);
                     agent.current_path = None; // Clear existing path
-                    info!("Player pathfinding target set: ({:.2}, {:.2}, {:.2})", 
+                    info!("Player pathfinding target set: ({:.2}, {:.2}, {:.2})",
                           target.x, target.y, target.z);
                 }
             }
@@ -314,14 +314,14 @@ fn enemy_ai(
     // ... other existing parameters
 ) {
     let player_pos = player_query.single().translation;
-    
+
     for (transform, enemy, mut agent) in enemy_query.iter_mut() {
         if enemy.is_dying {
             continue;
         }
-        
+
         let distance = transform.translation.distance(player_pos);
-        
+
         if distance <= enemy.chase_distance.0 && distance > agent.stopping_distance {
             // Set pathfinding destination instead of direct movement
             agent.destination = Some(player_pos);
@@ -353,7 +353,7 @@ fn initialize_navigation_grid(
 }
 
 // Add to MapLoaderPlugin:
-.add_systems(OnEnter(GameState::Playing), 
+.add_systems(OnEnter(GameState::Playing),
     initialize_navigation_grid.after(load_map))
 ```
 
@@ -368,38 +368,38 @@ impl NavigationGrid {
         let width = terrain.width;
         let height = terrain.height;
         let cell_size = terrain.scale;
-        
+
         // Center the grid on the terrain
         let world_width = width as f32 * cell_size;
         let world_height = height as f32 * cell_size;
         let origin = Vec3::new(-world_width / 2.0, 0.0, -world_height / 2.0);
-        
+
         let mut walkable = Vec::with_capacity((width * height) as usize);
-        
+
         for z in 0..height {
             for x in 0..width {
                 // Calculate slope to determine walkability
                 let current_height = terrain.get_height_at_grid(x, z).unwrap_or(0.0);
-                
+
                 // Check neighboring cells for slope calculation
                 let mut max_slope = 0.0;
                 for (dx, dz) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
                     let nx = (x as i32 + dx) as u32;
                     let nz = (z as i32 + dz) as u32;
-                    
+
                     if let Some(neighbor_height) = terrain.get_height_at_grid(nx, nz) {
                         let height_diff = (current_height - neighbor_height).abs();
                         let slope = height_diff / cell_size;
                         max_slope = max_slope.max(slope);
                     }
                 }
-                
+
                 // Walkable if slope is reasonable (less than 45 degrees = slope of 1.0)
                 let is_walkable = max_slope < 0.8; // Slightly less than 45 degrees for safety
                 walkable.push(is_walkable);
             }
         }
-        
+
         Self {
             width,
             height,
@@ -420,7 +420,7 @@ impl NavigationGrid {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_grid_coordinate_conversion() {
         let grid = NavigationGrid {
@@ -430,16 +430,16 @@ mod tests {
             origin: Vec3::new(-10.0, 0.0, -10.0),
             walkable: vec![true; 100],
         };
-        
+
         let world_pos = Vec3::new(0.0, 0.0, 0.0);
         let grid_coords = grid.world_to_grid(world_pos).unwrap();
         assert_eq!(grid_coords, (5, 5));
-        
+
         let back_to_world = grid.grid_to_world(5, 5);
         assert!((world_pos.x - back_to_world.x).abs() < 0.1);
         assert!((world_pos.z - back_to_world.z).abs() < 0.1);
     }
-    
+
     #[test]
     fn test_simple_pathfinding() {
         let mut grid = NavigationGrid {
@@ -449,10 +449,10 @@ mod tests {
             origin: Vec3::new(-2.5, 0.0, -2.5),
             walkable: vec![true; 25],
         };
-        
+
         let start = Vec3::new(-2.0, 0.0, -2.0);
         let end = Vec3::new(2.0, 0.0, 2.0);
-        
+
         let path = grid.find_path(start, end);
         assert!(path.is_some());
         assert!(path.unwrap().len() > 1);
@@ -473,7 +473,7 @@ fn test_pathfinding_scene() -> App {
     app.add_plugins(MinimalPlugins)
        .add_plugins(PathfindingPlugin)
        .insert_resource(NavigationGrid::default());
-    
+
     // Spawn test agent
     app.world.spawn((
         Transform::from_translation(Vec3::new(-10.0, 0.0, -10.0)),
@@ -482,7 +482,7 @@ fn test_pathfinding_scene() -> App {
             ..Default::default()
         },
     ));
-    
+
     app
 }
 ```
@@ -509,7 +509,7 @@ Choose grid resolution based on world size and detail requirements.
 
 ```
 src/pathfinding/
-├── mod.rs              # Plugin and public API  
+├── mod.rs              # Plugin and public API
 ├── components.rs       # PathfindingAgent, NavigationGrid
 ├── navigation.rs       # Core pathfinding algorithms
 ├── systems.rs          # Bevy systems (find_paths, follow_paths)
@@ -532,7 +532,7 @@ src/pathfinding/
 3. **Add to main.rs**:
    ```rust
    use minion::pathfinding::PathfindingPlugin;
-   
+
    app.add_plugins(PathfindingPlugin);
    ```
 

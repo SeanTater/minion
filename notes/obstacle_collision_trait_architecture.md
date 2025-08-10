@@ -39,30 +39,30 @@ match obj.object_type.as_str() {
 pub trait Obstacle {
     /// Get the obstacle's collision shape for pathfinding
     fn collision_shape(&self) -> CollisionShape;
-    
+
     /// Check if this obstacle blocks pathfinding at all
     fn blocks_pathfinding(&self) -> bool { true }
-    
+
     /// Get obstacle priority for overlapping obstacles (higher = more important)
     fn blocking_priority(&self) -> u8 { 100 }
-    
+
     /// Get the world position of this obstacle
     fn world_position(&self) -> Vec3;
-    
+
     /// Test if a world position is inside this obstacle
     fn contains_point(&self, world_pos: Vec3) -> bool {
         self.collision_shape().contains_point(world_pos, self.world_position())
     }
-    
+
     /// Apply blocking to navigation grid (optimized for batch operations)
     fn apply_blocking(&self, nav_grid: &mut NavigationGrid) {
         if !self.blocks_pathfinding() {
             return;
         }
-        
+
         self.collision_shape().block_navigation_grid(
-            nav_grid, 
-            self.world_position(), 
+            nav_grid,
+            self.world_position(),
             self.blocking_priority()
         );
     }
@@ -108,7 +108,7 @@ impl CollisionShape {
             CollisionShape::None => false,
         }
     }
-    
+
     /// Apply this shape to the navigation grid (optimized implementation)
     pub fn block_navigation_grid(&self, nav_grid: &mut NavigationGrid, center: Vec3, priority: u8) {
         match self {
@@ -130,7 +130,7 @@ impl CollisionShape {
             CollisionShape::None => {}, // No blocking
         }
     }
-    
+
     /// Get approximate bounds for this shape (used for spatial optimization)
     pub fn approximate_bounds(&self, center: Vec3) -> (Vec3, Vec3) {
         match self {
@@ -191,14 +191,14 @@ impl From<&EnvironmentObject> for EnvironmentObstacle {
             "rock" => EnvironmentObjectType::Rock { collision_factor: 0.5 },
             "boulder" => EnvironmentObjectType::Boulder { collision_factor: 0.5 },
             "grass" => EnvironmentObjectType::Grass,
-            name => EnvironmentObjectType::Custom { 
-                name: name.to_string(), 
-                collision_shape: CollisionShape::Rectangle { 
-                    half_extents: obj.scale * 0.5 
+            name => EnvironmentObjectType::Custom {
+                name: name.to_string(),
+                collision_shape: CollisionShape::Rectangle {
+                    half_extents: obj.scale * 0.5
                 }
             },
         };
-        
+
         Self {
             object_type,
             position: obj.position,
@@ -214,7 +214,7 @@ impl Obstacle for EnvironmentObstacle {
             EnvironmentObjectType::Tree { trunk_radius_factor } => {
                 CollisionShape::Circle { radius: self.scale.x * trunk_radius_factor }
             }
-            EnvironmentObjectType::Rock { collision_factor } | 
+            EnvironmentObjectType::Rock { collision_factor } |
             EnvironmentObjectType::Boulder { collision_factor } => {
                 CollisionShape::Circle { radius: self.scale.x * collision_factor }
             }
@@ -223,15 +223,15 @@ impl Obstacle for EnvironmentObstacle {
             EnvironmentObjectType::Custom { collision_shape, .. } => collision_shape.clone(),
         }
     }
-    
+
     fn blocks_pathfinding(&self) -> bool {
         !matches!(self.object_type, EnvironmentObjectType::Grass)
     }
-    
+
     fn world_position(&self) -> Vec3 {
         self.position
     }
-    
+
     fn blocking_priority(&self) -> u8 {
         match &self.object_type {
             EnvironmentObjectType::Tree { .. } => 150,     // Trees are important obstacles
@@ -265,11 +265,11 @@ impl Obstacle for EntityObstacle {
     fn collision_shape(&self) -> CollisionShape {
         CollisionShape::Circle { radius: self.collision_radius }
     }
-    
+
     fn world_position(&self) -> Vec3 {
         self.position
     }
-    
+
     fn blocking_priority(&self) -> u8 {
         match self.obstacle_type {
             EntityObstacleType::Player => 180,
@@ -288,24 +288,24 @@ impl Obstacle for EntityObstacle {
 fn block_circular_area_optimized(nav_grid: &mut NavigationGrid, center: Vec3, radius: f32, priority: u8) {
     let Some(center_cell) = nav_grid.world_to_grid(center) else { return };
     let cell_radius = (radius / nav_grid.cell_size).ceil() as i32;
-    
+
     // Pre-calculate world coordinate conversion constants
     let half_width = (nav_grid.terrain_width as f32 * nav_grid.terrain_scale) / 2.0;
     let half_height = (nav_grid.terrain_height as f32 * nav_grid.terrain_scale) / 2.0;
     let radius_squared = radius * radius;
-    
+
     for dz in -cell_radius..=cell_radius {
         for dx in -cell_radius..=cell_radius {
             let x = center_cell.x as i32 + dx;
             let z = center_cell.z as i32 + dz;
-            
+
             if x >= 0 && z >= 0 && x < nav_grid.width as i32 && z < nav_grid.height as i32 {
                 // Fast distance check using squared distance
                 let world_x = (x as f32 * nav_grid.terrain_scale) - half_width;
                 let world_z = (z as f32 * nav_grid.terrain_scale) - half_height;
                 let dx_world = world_x - center.x;
                 let dz_world = world_z - center.z;
-                
+
                 if dx_world * dx_world + dz_world * dz_world <= radius_squared {
                     let cell = GridNode::new(x as u32, z as u32);
                     nav_grid.set_cell_walkable_with_priority(cell, false, priority);
@@ -318,10 +318,10 @@ fn block_circular_area_optimized(nav_grid: &mut NavigationGrid, center: Vec3, ra
 fn block_rectangular_area_optimized(nav_grid: &mut NavigationGrid, center: Vec3, half_extents: Vec3, priority: u8) {
     let min_world = center - half_extents;
     let max_world = center + half_extents;
-    
+
     let Some(min_cell) = nav_grid.world_to_grid(min_world) else { return };
     let Some(max_cell) = nav_grid.world_to_grid(max_world) else { return };
-    
+
     for z in min_cell.z..=max_cell.z {
         for x in min_cell.x..=max_cell.x {
             nav_grid.set_cell_walkable_with_priority(GridNode::new(x, z), false, priority);
@@ -337,7 +337,7 @@ impl NavigationGrid {
             return;
         }
         let index = (node.z * self.width + node.x) as usize;
-        
+
         // Only override if this obstacle has higher or equal priority
         if !walkable {
             // For obstacle placement, higher priority wins
@@ -348,7 +348,7 @@ impl NavigationGrid {
             }
             self.obstacle_priorities[index] = priority;
         }
-        
+
         if let Some(cell) = self.walkable.get_mut(index) {
             *cell = walkable;
         }
@@ -374,14 +374,14 @@ impl ObstacleManager {
             spatial_cache: None,
         }
     }
-    
+
     /// Add static obstacle from environment object
     pub fn add_environment_obstacle(&mut self, env_obj: &EnvironmentObject) {
         let obstacle = EnvironmentObstacle::from(env_obj);
         self.static_obstacles.push(Box::new(obstacle));
         self.spatial_cache = None; // Invalidate cache
     }
-    
+
     /// Add dynamic obstacle from entity
     pub fn add_entity_obstacle(&mut self, entity: Entity, position: Vec3, radius: f32, obstacle_type: EntityObstacleType) {
         let obstacle = EntityObstacle {
@@ -392,25 +392,25 @@ impl ObstacleManager {
         };
         self.dynamic_obstacles.push(Box::new(obstacle));
     }
-    
+
     /// Clear all dynamic obstacles (called each frame)
     pub fn clear_dynamic_obstacles(&mut self) {
         self.dynamic_obstacles.clear();
     }
-    
+
     /// Apply all obstacles to navigation grid with priority system
     pub fn apply_to_navigation_grid(&self, nav_grid: &mut NavigationGrid) {
         // Apply static obstacles first (they have consistent priority)
         for obstacle in &self.static_obstacles {
             obstacle.apply_blocking(nav_grid);
         }
-        
+
         // Apply dynamic obstacles (may override static based on priority)
         for obstacle in &self.dynamic_obstacles {
             obstacle.apply_blocking(nav_grid);
         }
     }
-    
+
     /// Build spatial cache for fast queries (for future optimization)
     pub fn build_spatial_cache(&mut self, bounds: (Vec3, Vec3)) {
         // Implementation would use spatial hashing or similar
@@ -487,15 +487,15 @@ impl Obstacle for BridgeObstacle {
     fn collision_shape(&self) -> CollisionShape {
         // Bridge is walkable surface, not blocking
         if self.blocks_ground_units {
-            CollisionShape::Rectangle { 
-                half_extents: Vec3::new(self.width * 0.5, 0.0, 
-                    self.start.distance(self.end) * 0.5) 
+            CollisionShape::Rectangle {
+                half_extents: Vec3::new(self.width * 0.5, 0.0,
+                    self.start.distance(self.end) * 0.5)
             }
         } else {
             CollisionShape::None
         }
     }
-    
+
     fn world_position(&self) -> Vec3 {
         (self.start + self.end) * 0.5
     }
@@ -518,7 +518,7 @@ pub fn update_entity_obstacles(
     mut obstacle_manager: ResMut<ObstacleManager>,
 ) {
     obstacle_manager.clear_dynamic_obstacles();
-    
+
     for (entity, transform, obstacle_source) in obstacle_entities.iter() {
         if obstacle_source.blocks_pathfinding {
             obstacle_manager.add_entity_obstacle(

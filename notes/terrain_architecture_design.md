@@ -13,7 +13,7 @@ The terrain generation follows a layered approach where each layer builds upon t
 ```
 Base Height Layer (existing)     → Heightmap via noise functions
 ↓
-Biome Region Layer (new)         → Voronoi regions with climate data  
+Biome Region Layer (new)         → Voronoi regions with climate data
 ↓
 Biome Blending Layer (new)       → Smooth transitions between regions
 ↓
@@ -32,13 +32,13 @@ Object Placement Layer (enhanced) → Size-varied, biome-appropriate objects
 pub struct BiomeTerrainData {
     // Existing terrain data
     pub base: TerrainData,
-    
+
     // New biome data
     pub biome_map: Vec<BiomeType>,     // Per-vertex primary biome
     pub blend_weights: Vec<[f32; 4]>,  // Up to 4 biomes per vertex with weights
     pub surface_materials: Vec<SurfaceType>, // Surface material per vertex
     pub path_network: PathNetwork,     // Generated path data
-    
+
     // Generation metadata
     pub biome_seed: u32,
     pub biome_regions: Vec<BiomeRegion>,
@@ -125,8 +125,8 @@ pub struct BiomeBlender {
 }
 
 impl BiomeBlender {
-    pub fn calculate_weights(&self, 
-        position: Vec2, 
+    pub fn calculate_weights(&self,
+        position: Vec2,
         regions: &[BiomeRegion]) -> BlendWeights {
         // 1. Find nearest 4 biome regions using Voronoi distance
         // 2. Calculate distance-based weights with smooth falloff
@@ -144,7 +144,7 @@ pub struct SurfaceMaterializer {
 }
 
 impl SurfaceMaterializer {
-    pub fn assign_materials(&self, 
+    pub fn assign_materials(&self,
         biome_weights: &BlendWeights,
         height: f32,
         slope: f32,
@@ -174,7 +174,7 @@ pub struct PathGenerator {
 }
 
 impl PathGenerator {
-    pub fn generate_paths(&self, 
+    pub fn generate_paths(&self,
         terrain: &BiomeTerrainData,
         interesting_points: &[Vec2]) -> PathNetwork {
         // 1. Generate potential path nodes using spatial sampling
@@ -195,7 +195,7 @@ pub struct BiomeObjectPlacer {
 }
 
 impl BiomeObjectPlacer {
-    pub fn place_objects(&self, 
+    pub fn place_objects(&self,
         terrain: &BiomeTerrainData) -> Vec<EnvironmentObject> {
         // 1. Calculate placement density from biome blend weights
         // 2. Use Poisson disk sampling for natural distribution
@@ -225,7 +225,7 @@ pub enum TerrainAlgorithm {
     Flat { height: f32 },
     Perlin { amplitude: f32, frequency: f32, octaves: u32 },
     Ridged { amplitude: f32, frequency: f32, octaves: u32 },
-    
+
     // New biome-based variant
     BiomeBased {
         base_algorithm: Box<TerrainAlgorithm>,
@@ -321,10 +321,10 @@ Following the project's error handling patterns:
 pub enum BiomeGenerationError {
     #[error("Invalid biome configuration: {reason}")]
     InvalidBiomeConfig { reason: String },
-    
+
     #[error("Voronoi generation failed: {reason}")]
     VoronoiGenerationFailed { reason: String },
-    
+
     #[error("Path generation failed: {reason}")]
     PathGenerationFailed { reason: String },
 }

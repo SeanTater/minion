@@ -76,10 +76,10 @@ impl Plugin for PathfindingPlugin {
                 // High priority: path planning
                 update_navigation_targets,
                 plan_paths.after(update_navigation_targets),
-                
+
                 // Medium priority: path following
                 follow_paths.after(plan_paths),
-                
+
                 // Low priority: maintenance
                 replan_invalidated_paths,
                 update_dynamic_obstacles,
@@ -118,11 +118,11 @@ impl NavGrid {
         // Apply obstacle masks
         // Calculate movement costs based on slope, biome, etc.
     }
-    
+
     pub fn world_to_grid(&self, world_pos: Vec3) -> Option<(u32, u32)> {
         // Convert world coordinates to grid coordinates
     }
-    
+
     pub fn grid_to_world(&self, grid_x: u32, grid_z: u32) -> Vec3 {
         // Convert grid coordinates to world center point
     }
@@ -152,16 +152,16 @@ pub fn calculate_pathfinding_movement(
     let target = path
         .and_then(|p| p.waypoints.get(path_progress))
         .copied();
-    
+
     let movement = calculate_movement(current_position, target, config);
-    
+
     // Advance to next waypoint if close enough to current one
     let new_progress = if movement.distance_to_target <= config.stopping_distance {
         path_progress + 1
     } else {
         path_progress
     };
-    
+
     (movement, new_progress)
 }
 ```
@@ -171,8 +171,8 @@ pub fn calculate_pathfinding_movement(
 ```rust
 fn follow_paths(
     mut agents: Query<(
-        &Transform, 
-        &mut PathfindingAgent, 
+        &Transform,
+        &mut PathfindingAgent,
         &mut KinematicCharacterController
     )>,
     time: Res<Time>,
@@ -186,14 +186,14 @@ fn follow_paths(
                 slowdown_distance: agent.agent_config.slowdown_distance,
                 delta_time: time.delta_secs(),
             };
-            
+
             let (movement, new_progress) = calculate_pathfinding_movement(
                 transform.translation,
                 Some(path),
                 agent.path_progress,
                 config,
             );
-            
+
             if movement.should_move {
                 // Apply movement through physics system
                 let movement_with_gravity = Vec3::new(
@@ -202,15 +202,15 @@ fn follow_paths(
                     movement.movement_vector.z,
                 );
                 controller.translation = Some(movement_with_gravity);
-                
+
                 // Handle rotation
                 if let Some(rotation_target) = movement.rotation_target {
                     // Apply rotation through transform (consistent with existing system)
                 }
             }
-            
+
             agent.path_progress = new_progress;
-            
+
             // Clear path if completed
             if agent.path_progress >= path.waypoints.len() {
                 agent.current_path = None;
@@ -244,7 +244,7 @@ fn replan_invalidated_paths(
 ) {
     for (transform, mut agent) in agents.iter_mut() {
         agent.replanning_timer += time.delta_secs();
-        
+
         let should_replan = agent.current_path.as_ref().map_or(false, |path| {
             // Time-based replanning
             agent.replanning_timer > agent.agent_config.replanning_interval ||
@@ -253,7 +253,7 @@ fn replan_invalidated_paths(
             // Obstacle-based replanning
             is_path_blocked(path, &dynamic_obstacles, agent.path_progress)
         });
-        
+
         if should_replan {
             agent.replanning_timer = 0.0;
             // Trigger replanning in the next frame
@@ -263,7 +263,7 @@ fn replan_invalidated_paths(
 }
 
 fn is_path_blocked(
-    path: &NavPath, 
+    path: &NavPath,
     obstacles: &Query<&Transform, (With<PathfindingObstacle>, Without<PathfindingAgent>)>,
     current_progress: usize,
 ) -> bool {
@@ -353,14 +353,14 @@ fn enemy_ai(
     // other params...
 ) {
     let player_pos = player_query.single().translation;
-    
+
     for (transform, enemy, mut agent) in enemy_query.iter_mut() {
         let distance = transform.translation.distance(player_pos);
-        
+
         if distance <= enemy.chase_distance.0 && distance > game_config.settings.enemy_stopping_distance {
             // Set pathfinding destination instead of direct movement
             agent.destination = Some(player_pos);
-            
+
             // The pathfinding systems will handle the actual movement
         } else {
             // Stop chasing
@@ -380,18 +380,18 @@ fn enemy_ai(
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_grid_coordinate_conversion() {
         let grid = NavGrid::new(64, 64, 2.0);
         let world_pos = Vec3::new(10.0, 0.0, 20.0);
         let grid_coords = grid.world_to_grid(world_pos).unwrap();
         let back_to_world = grid.grid_to_world(grid_coords.0, grid_coords.1);
-        
+
         assert!((world_pos.x - back_to_world.x).abs() < 1.0);
         assert!((world_pos.z - back_to_world.z).abs() < 1.0);
     }
-    
+
     #[test]
     fn test_pathfinding_movement_calculation() {
         let path = NavPath {
@@ -403,14 +403,14 @@ mod tests {
             created_at: 0.0,
             path_type: PathType::Direct,
         };
-        
+
         let config = MovementConfig::default();
         let current_pos = Vec3::new(0.1, 0.0, 0.0);
-        
+
         let (movement, new_progress) = calculate_pathfinding_movement(
             current_pos, Some(&path), 0, config
         );
-        
+
         assert!(movement.should_move);
         assert_eq!(new_progress, 1); // Should advance to next waypoint
     }
@@ -421,17 +421,17 @@ mod tests {
 
 ```rust
 // Component interaction testing
-#[test] 
+#[test]
 fn test_pathfinding_agent_integration() {
     let mut world = World::new();
-    
+
     // Set up test scenario
     world.spawn((
         Transform::from_translation(Vec3::ZERO),
         PathfindingAgent::default(),
         KinematicCharacterController::default(),
     ));
-    
+
     // Test system interactions
     // ...
 }
@@ -443,10 +443,10 @@ fn test_pathfinding_agent_integration() {
 #[bench]
 fn bench_pathfinding_performance(b: &mut Bencher) {
     let nav_grid = create_test_grid(256, 256);
-    
+
     b.iter(|| {
         let path = nav_grid.find_path(
-            (0, 0), 
+            (0, 0),
             (255, 255),
             &PathfindingConfig::default()
         );
@@ -459,7 +459,7 @@ fn bench_pathfinding_performance(b: &mut Bencher) {
 
 ### Optimization Strategies
 
-1. **Hierarchical Pathfinding**: 
+1. **Hierarchical Pathfinding**:
    - Coarse planning on reduced grid (1/4 resolution)
    - Fine planning only near agent
    - Reduces search space by ~16x

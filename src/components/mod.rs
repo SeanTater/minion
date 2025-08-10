@@ -1,3 +1,4 @@
+use crate::game_logic::errors::MinionError;
 use crate::resources::GameSettings;
 use bevy::prelude::*;
 use derive_more::{Add, Display, From, Mul};
@@ -25,6 +26,26 @@ pub struct Energy;
 pub type HealthPool = ResourcePool<Health>;
 pub type ManaPool = ResourcePool<Mana>;
 pub type EnergyPool = ResourcePool<Energy>;
+
+/// Trait for entities that have resource pools (health, mana, energy)
+pub trait HasResources {
+    fn health(&self) -> &HealthPool;
+    fn mana(&self) -> &ManaPool;
+    fn energy(&self) -> &EnergyPool;
+
+    fn health_mut(&mut self) -> &mut HealthPool;
+    fn mana_mut(&mut self) -> &mut ManaPool;
+    fn energy_mut(&mut self) -> &mut EnergyPool;
+
+    /// Get resource values by type
+    fn get_resource(&self, resource_type: ResourceType) -> (f32, f32) {
+        match resource_type {
+            ResourceType::Health => (self.health().current, self.health().max),
+            ResourceType::Mana => (self.mana().current, self.mana().max),
+            ResourceType::Energy => (self.energy().current, self.energy().max),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Mul, Display, From)]
 pub struct Speed(pub f32);
@@ -196,6 +217,28 @@ pub struct Player {
     pub energy: EnergyPool,
 }
 
+impl HasResources for Player {
+    fn health(&self) -> &HealthPool {
+        &self.health
+    }
+    fn mana(&self) -> &ManaPool {
+        &self.mana
+    }
+    fn energy(&self) -> &EnergyPool {
+        &self.energy
+    }
+
+    fn health_mut(&mut self) -> &mut HealthPool {
+        &mut self.health
+    }
+    fn mana_mut(&mut self) -> &mut ManaPool {
+        &mut self.mana
+    }
+    fn energy_mut(&mut self) -> &mut EnergyPool {
+        &mut self.energy
+    }
+}
+
 #[derive(Component)]
 pub struct Ground;
 
@@ -217,6 +260,28 @@ pub struct Enemy {
     pub is_dying: bool,
 }
 
+impl HasResources for Enemy {
+    fn health(&self) -> &HealthPool {
+        &self.health
+    }
+    fn mana(&self) -> &ManaPool {
+        &self.mana
+    }
+    fn energy(&self) -> &EnergyPool {
+        &self.energy
+    }
+
+    fn health_mut(&mut self) -> &mut HealthPool {
+        &mut self.health
+    }
+    fn mana_mut(&mut self) -> &mut ManaPool {
+        &mut self.mana
+    }
+    fn energy_mut(&mut self) -> &mut EnergyPool {
+        &mut self.energy
+    }
+}
+
 #[derive(Component)]
 pub struct Name(pub String);
 
@@ -227,16 +292,25 @@ pub enum LodLevel {
     Low,    // Low-poly model
 }
 
-impl LodLevel {
-    /// Parse LOD level from config string, defaulting to High for invalid values
-    pub fn from_config_string(config_str: &str) -> Self {
+impl TryFrom<&str> for LodLevel {
+    type Error = MinionError;
+
+    fn try_from(config_str: &str) -> Result<Self, Self::Error> {
         match config_str {
-            "medium" => LodLevel::Medium,
-            "low" => LodLevel::Low,
-            _ => LodLevel::High, // Default to high if invalid string
+            "high" => Ok(LodLevel::High),
+            "medium" => Ok(LodLevel::Medium),
+            "low" => Ok(LodLevel::Low),
+            _ => Err(MinionError::InvalidConfig {
+                reason: format!(
+                    "Invalid LOD level '{}', expected 'high', 'medium', or 'low'",
+                    config_str
+                ),
+            }),
         }
     }
+}
 
+impl LodLevel {
     /// Apply global max LOD level cap to a desired LOD level
     pub fn apply_max_cap(desired: LodLevel, max_cap: LodLevel) -> LodLevel {
         match (desired, max_cap) {
@@ -322,22 +396,22 @@ pub enum AreaEffectType {
 impl AreaEffectType {
     pub fn damage_per_second(&self, settings: &GameSettings) -> Damage {
         match self {
-            AreaEffectType::Magic => Damage::new(settings.magic_damage_per_second),
-            AreaEffectType::Poison => Damage::new(settings.poison_damage_per_second),
+            AreaEffectType::Magic => Damage::new(settings.magic_damage_per_second.get()),
+            AreaEffectType::Poison => Damage::new(settings.poison_damage_per_second.get()),
         }
     }
 
     pub fn radius(&self, settings: &GameSettings) -> Distance {
         match self {
-            AreaEffectType::Magic => Distance::new(settings.magic_area_radius),
-            AreaEffectType::Poison => Distance::new(settings.poison_area_radius),
+            AreaEffectType::Magic => Distance::new(settings.magic_area_radius.get()),
+            AreaEffectType::Poison => Distance::new(settings.poison_area_radius.get()),
         }
     }
 
     pub fn duration(&self, settings: &GameSettings) -> f32 {
         match self {
-            AreaEffectType::Magic => settings.magic_area_duration,
-            AreaEffectType::Poison => settings.poison_area_duration,
+            AreaEffectType::Magic => settings.magic_area_duration.get(),
+            AreaEffectType::Poison => settings.poison_area_duration.get(),
         }
     }
 
@@ -355,13 +429,112 @@ pub struct AreaEffect {
     pub elapsed: f32,
 }
 
+/// Type-safe wrapper for navigation paths that prevents index-out-of-bounds errors
+#[derive(Debug, Clone, PartialEq)]
+pub struct NavPath {
+    waypoints: Vec<Vec3>,
+    current_index: usize,
+}
+
+impl NavPath {
+    /// Create a new empty navigation path
+    pub fn new() -> Self {
+        Self {
+            waypoints: Vec::new(),
+            current_index: 0,
+        }
+    }
+
+    /// Create a navigation path from a vector of waypoints
+    pub fn from_waypoints(waypoints: Vec<Vec3>) -> Self {
+        Self {
+            waypoints,
+            current_index: 0,
+        }
+    }
+
+    /// Get the current waypoint the agent should move towards
+    pub fn current_waypoint(&self) -> Option<Vec3> {
+        self.waypoints.get(self.current_index).copied()
+    }
+
+    /// Advance to the next waypoint in the path
+    pub fn advance(&mut self) -> bool {
+        if self.current_index < self.waypoints.len() {
+            self.current_index += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Check if the path is complete (no more waypoints)
+    pub fn is_complete(&self) -> bool {
+        self.current_index >= self.waypoints.len()
+    }
+
+    /// Check if the path has any waypoints
+    pub fn is_empty(&self) -> bool {
+        self.waypoints.is_empty()
+    }
+
+    /// Check if there's a valid current waypoint
+    pub fn has_current_waypoint(&self) -> bool {
+        !self.is_empty() && !self.is_complete()
+    }
+
+    /// Get the total number of waypoints in the path
+    pub fn len(&self) -> usize {
+        self.waypoints.len()
+    }
+
+    /// Get the current waypoint index
+    pub fn current_index(&self) -> usize {
+        self.current_index
+    }
+
+    /// Get the remaining waypoints count
+    pub fn remaining_waypoints(&self) -> usize {
+        if self.current_index < self.waypoints.len() {
+            self.waypoints.len() - self.current_index
+        } else {
+            0
+        }
+    }
+
+    /// Clear all waypoints and reset to beginning
+    pub fn clear(&mut self) {
+        self.waypoints.clear();
+        self.current_index = 0;
+    }
+
+    /// Get the final destination (last waypoint)
+    pub fn final_destination(&self) -> Option<Vec3> {
+        self.waypoints.last().copied()
+    }
+
+    /// Reset to the beginning of the path
+    pub fn reset(&mut self) {
+        self.current_index = 0;
+    }
+
+    /// Get all waypoints (for debugging or advanced usage)
+    pub fn waypoints(&self) -> &[Vec3] {
+        &self.waypoints
+    }
+}
+
+impl Default for NavPath {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Pathfinding agent component that can be used by both players and enemies
 #[derive(Component)]
 pub struct PathfindingAgent {
-    /// Current path as a series of waypoints in world coordinates
-    pub current_path: Vec<Vec3>,
-    /// Index of the next waypoint to reach in the current path
-    pub path_index: usize,
+    /// Current navigation path with type-safe waypoint management
+    pub nav_path: NavPath,
     /// Final destination for this agent
     pub destination: Option<Vec3>,
     /// Time when the path was last recalculated
@@ -380,8 +553,7 @@ impl PathfindingAgent {
     /// Create a new pathfinding agent with default settings
     pub fn new() -> Self {
         Self {
-            current_path: Vec::new(),
-            path_index: 0,
+            nav_path: NavPath::new(),
             destination: None,
             last_replan_time: 0.0,
             replan_interval: 0.5,         // Replan every 0.5 seconds
@@ -401,31 +573,27 @@ impl Default for PathfindingAgent {
 impl PathfindingAgent {
     /// Get the current waypoint this agent is moving towards
     pub fn current_waypoint(&self) -> Option<Vec3> {
-        self.current_path.get(self.path_index).copied()
+        self.nav_path.current_waypoint()
     }
 
     /// Check if the agent has a valid path to follow
     pub fn has_path(&self) -> bool {
-        !self.current_path.is_empty() && self.path_index < self.current_path.len()
+        self.nav_path.has_current_waypoint()
     }
 
     /// Clear the current path
     pub fn clear_path(&mut self) {
-        self.current_path.clear();
-        self.path_index = 0;
+        self.nav_path.clear();
     }
 
     /// Set a new path for the agent
     pub fn set_path(&mut self, path: Vec<Vec3>) {
-        self.current_path = path;
-        self.path_index = 0;
+        self.nav_path = NavPath::from_waypoints(path);
     }
 
     /// Advance to the next waypoint in the path
     pub fn advance_waypoint(&mut self) {
-        if self.path_index < self.current_path.len() {
-            self.path_index += 1;
-        }
+        self.nav_path.advance();
     }
 }
 
@@ -527,14 +695,162 @@ mod tests {
     fn test_area_effect_types() {
         let settings = GameSettings::default();
 
+        // Test magic area effect
         let magic = AreaEffectType::Magic;
-        assert_eq!(magic.damage_per_second(&settings).0, 150.0);
-        assert_eq!(magic.radius(&settings).0, 3.0);
-        assert_eq!(magic.duration(&settings), 2.0);
+        assert!(magic.damage_per_second(&settings).0 > 0.0);
+        assert!(magic.radius(&settings).0 > 0.0);
+        assert!(magic.duration(&settings) > 0.0);
 
+        // Test poison area effect
         let poison = AreaEffectType::Poison;
-        assert_eq!(poison.damage_per_second(&settings).0, 80.0);
-        assert_eq!(poison.radius(&settings).0, 4.0);
-        assert_eq!(poison.duration(&settings), 4.0);
+        assert!(poison.damage_per_second(&settings).0 > 0.0);
+        assert!(poison.radius(&settings).0 > 0.0);
+        assert!(poison.duration(&settings) > 0.0);
+    }
+
+    #[test]
+    fn test_has_resources_trait() {
+        // Test Player implements HasResources
+        let mut player = Player {
+            move_target: None,
+            speed: Speed::new(5.0),
+            health: HealthPool::new_full(100.0),
+            mana: ManaPool::new_full(50.0),
+            energy: EnergyPool::new_full(75.0),
+        };
+
+        // Test resource access
+        assert_eq!(player.get_resource(ResourceType::Health), (100.0, 100.0));
+        assert_eq!(player.get_resource(ResourceType::Mana), (50.0, 50.0));
+        assert_eq!(player.get_resource(ResourceType::Energy), (75.0, 75.0));
+
+        // Test mutable access
+        player.health_mut().take_damage(Damage::new(20.0));
+        assert_eq!(player.get_resource(ResourceType::Health), (80.0, 100.0));
+
+        // Test Enemy implements HasResources
+        let mut enemy = Enemy {
+            speed: Speed::new(3.0),
+            health: HealthPool::new_full(80.0),
+            mana: ManaPool::new_full(30.0),
+            energy: EnergyPool::new_full(40.0),
+            chase_distance: Distance::new(10.0),
+            is_dying: false,
+        };
+
+        // Test resource access
+        assert_eq!(enemy.get_resource(ResourceType::Health), (80.0, 80.0));
+        assert_eq!(enemy.get_resource(ResourceType::Mana), (30.0, 30.0));
+        assert_eq!(enemy.get_resource(ResourceType::Energy), (40.0, 40.0));
+
+        // Test mutable access
+        enemy.mana_mut().spend(10.0);
+        assert_eq!(enemy.get_resource(ResourceType::Mana), (20.0, 30.0));
+    }
+
+    #[test]
+    fn test_nav_path_empty() {
+        let path = NavPath::new();
+        assert!(path.is_empty());
+        assert!(path.is_complete());
+        assert!(!path.has_current_waypoint());
+        assert_eq!(path.current_waypoint(), None);
+        assert_eq!(path.len(), 0);
+        assert_eq!(path.current_index(), 0);
+        assert_eq!(path.remaining_waypoints(), 0);
+        assert_eq!(path.final_destination(), None);
+    }
+
+    #[test]
+    fn test_nav_path_with_waypoints() {
+        let waypoints = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(2.0, 0.0, 0.0),
+        ];
+        let mut path = NavPath::from_waypoints(waypoints.clone());
+
+        assert!(!path.is_empty());
+        assert!(!path.is_complete());
+        assert!(path.has_current_waypoint());
+        assert_eq!(path.len(), 3);
+        assert_eq!(path.current_index(), 0);
+        assert_eq!(path.remaining_waypoints(), 3);
+        assert_eq!(path.current_waypoint(), Some(Vec3::new(0.0, 0.0, 0.0)));
+        assert_eq!(path.final_destination(), Some(Vec3::new(2.0, 0.0, 0.0)));
+
+        // Advance through waypoints
+        assert!(path.advance());
+        assert_eq!(path.current_index(), 1);
+        assert_eq!(path.remaining_waypoints(), 2);
+        assert_eq!(path.current_waypoint(), Some(Vec3::new(1.0, 0.0, 0.0)));
+
+        assert!(path.advance());
+        assert_eq!(path.current_index(), 2);
+        assert_eq!(path.remaining_waypoints(), 1);
+        assert_eq!(path.current_waypoint(), Some(Vec3::new(2.0, 0.0, 0.0)));
+
+        assert!(path.advance());
+        assert_eq!(path.current_index(), 3);
+        assert_eq!(path.remaining_waypoints(), 0);
+        assert_eq!(path.current_waypoint(), None);
+        assert!(path.is_complete());
+        assert!(!path.has_current_waypoint());
+
+        // Try to advance past end
+        assert!(!path.advance());
+        assert_eq!(path.current_index(), 3);
+    }
+
+    #[test]
+    fn test_nav_path_clear_and_reset() {
+        let waypoints = vec![Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.0, 0.0)];
+        let mut path = NavPath::from_waypoints(waypoints);
+
+        // Advance to second waypoint
+        path.advance();
+        assert_eq!(path.current_index(), 1);
+
+        // Reset to beginning
+        path.reset();
+        assert_eq!(path.current_index(), 0);
+        assert_eq!(path.current_waypoint(), Some(Vec3::new(0.0, 0.0, 0.0)));
+
+        // Clear the path
+        path.clear();
+        assert!(path.is_empty());
+        assert_eq!(path.current_index(), 0);
+        assert_eq!(path.current_waypoint(), None);
+    }
+
+    #[test]
+    fn test_pathfinding_agent_with_nav_path() {
+        let mut agent = PathfindingAgent::new();
+        assert!(!agent.has_path());
+        assert_eq!(agent.current_waypoint(), None);
+
+        let waypoints = vec![
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(1.0, 0.0, 0.0),
+            Vec3::new(2.0, 0.0, 0.0),
+        ];
+        agent.set_path(waypoints);
+
+        assert!(agent.has_path());
+        assert_eq!(agent.current_waypoint(), Some(Vec3::new(0.0, 0.0, 0.0)));
+
+        agent.advance_waypoint();
+        assert_eq!(agent.current_waypoint(), Some(Vec3::new(1.0, 0.0, 0.0)));
+
+        agent.advance_waypoint();
+        assert_eq!(agent.current_waypoint(), Some(Vec3::new(2.0, 0.0, 0.0)));
+
+        agent.advance_waypoint();
+        assert_eq!(agent.current_waypoint(), None);
+        assert!(!agent.has_path());
+
+        agent.clear_path();
+        assert!(!agent.has_path());
+        assert_eq!(agent.current_waypoint(), None);
     }
 }

@@ -2,7 +2,8 @@ use crate::game_logic::{MinionError, MinionResult};
 use crate::resources::GameConfig;
 use std::fs;
 use std::path::PathBuf;
-use validator::Validate;
+
+pub mod range_types;
 
 pub fn get_config_path() -> MinionResult<PathBuf> {
     let mut path = dirs::config_dir().ok_or(MinionError::ConfigDirNotFound)?;
@@ -18,16 +19,10 @@ pub fn load_config() -> MinionResult<GameConfig> {
     let contents = fs::read_to_string(&config_path)
         .map_err(|_| MinionError::ConfigFileNotFound { path: config_path })?;
 
-    let mut config = toml::from_str::<GameConfig>(&contents)?;
+    let config = toml::from_str::<GameConfig>(&contents)?;
 
-    // Validate settings and fall back to defaults for invalid values
-    if let Err(validation_errors) = config.settings.validate() {
-        eprintln!("Warning: Invalid config values found, using defaults for invalid fields:");
-        for error in validation_errors.field_errors() {
-            eprintln!("  {}: {:?}", error.0, error.1);
-        }
-        config.settings = crate::resources::GameSettings::default();
-    }
+    // Range-safe types automatically clamp values during deserialization
+    // No runtime validation needed - constraints are enforced at the type level
 
     Ok(config)
 }
@@ -40,11 +35,8 @@ pub fn load_config_or_default() -> GameConfig {
 }
 
 pub fn save_config(config: &GameConfig) -> MinionResult<()> {
-    // Validate before saving
-    config
-        .settings
-        .validate()
-        .map_err(|_| MinionError::InvalidConfig)?;
+    // Range-safe types ensure all values are valid by construction
+    // No validation needed before saving
 
     let config_path = get_config_path()?;
     let contents = toml::to_string_pretty(config)?;

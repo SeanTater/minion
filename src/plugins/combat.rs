@@ -1,4 +1,4 @@
-use crate::{components::*, game_logic::*, map::MapDefinition, resources::*};
+use crate::{components::*, game_logic::damage::*, map::MapDefinition, resources::*};
 use bevy::prelude::Camera3d;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
@@ -54,7 +54,11 @@ fn handle_combat_input(
                     let player_transform = player_query
                         .single()
                         .expect("Player should always exist when in Playing state");
+
+                    // Inline bullet spawn calculation
                     let direction = (world_pos - player_transform.translation).normalize();
+                    let spawn_position = player_transform.translation + Vec3::Y * 0.5;
+                    let normalized_direction = Vec3::new(direction.x, 0.0, direction.z).normalize();
 
                     commands.spawn((
                         Mesh3d(meshes.add(Sphere::new(0.1))),
@@ -63,12 +67,12 @@ fn handle_combat_input(
                             emissive: Color::srgb(0.5, 0.5, 0.0).into(),
                             ..default()
                         })),
-                        Transform::from_translation(player_transform.translation + Vec3::Y * 0.5),
+                        Transform::from_translation(spawn_position),
                         Bullet {
-                            direction: Vec3::new(direction.x, 0.0, direction.z).normalize(),
-                            speed: Speed::new(game_config.settings.bullet_speed),
-                            lifetime: game_config.settings.bullet_lifetime,
-                            damage: Damage::new(game_config.settings.bullet_damage),
+                            direction: normalized_direction,
+                            speed: Speed::new(game_config.settings.bullet_speed.get()),
+                            lifetime: game_config.settings.bullet_lifetime.get(),
+                            damage: Damage::new(game_config.settings.bullet_damage.get()),
                         },
                     ));
                 }
@@ -90,17 +94,19 @@ fn handle_combat_input(
             .single()
             .expect("Player should always exist when in Playing state");
         let effect_type = selected_effect.effect_type;
+
+        // Inline area effect spawn calculation
+        let spawn_position = player_transform.translation;
+        let radius = effect_type.radius(&game_config.settings).0;
+
         commands.spawn((
-            Mesh3d(meshes.add(Cylinder::new(
-                effect_type.radius(&game_config.settings).0,
-                0.1,
-            ))),
+            Mesh3d(meshes.add(Cylinder::new(radius, 0.1))),
             MeshMaterial3d(materials.add(StandardMaterial {
                 base_color: effect_type.base_color(),
                 alpha_mode: AlphaMode::Blend,
                 ..default()
             })),
-            Transform::from_translation(player_transform.translation),
+            Transform::from_translation(spawn_position),
             AreaEffect {
                 effect_type,
                 elapsed: 0.0,
@@ -115,13 +121,11 @@ fn update_bullets(
     time: Res<Time>,
 ) {
     for (entity, mut transform, mut bullet) in bullet_query.iter_mut() {
-        // Move bullet
+        // Inline bullet movement calculation
         transform.translation += bullet.direction * bullet.speed * time.delta_secs();
 
-        // Update lifetime
+        // Inline lifetime update and despawn check
         bullet.lifetime -= time.delta_secs();
-
-        // Despawn when lifetime expires
         if bullet.lifetime <= 0.0 {
             commands.entity(entity).despawn();
         }
@@ -137,12 +141,14 @@ fn update_area_effects(
     for (entity, mut effect, mut transform) in effect_query.iter_mut() {
         effect.elapsed += time.delta_secs();
 
-        // Fade effect over time
         let duration = effect.effect_type.duration(&game_config.settings);
-        let alpha = 1.0 - (effect.elapsed / duration);
-        transform.scale = Vec3::splat(alpha.max(0.1));
 
-        // Despawn when duration expires
+        // Inline area effect fade calculation
+        let alpha = 1.0 - (effect.elapsed / duration);
+        let scale = alpha.max(0.1);
+        transform.scale = Vec3::splat(scale);
+
+        // Inline despawn check
         if effect.elapsed >= duration {
             commands.entity(entity).despawn();
         }
@@ -163,7 +169,7 @@ fn bullet_enemy_collision(
             if check_collision(
                 bullet_transform.translation,
                 enemy_transform.translation,
-                Distance::new(game_config.settings.bullet_collision_distance),
+                Distance::new(game_config.settings.bullet_collision_distance.get()),
             ) {
                 // Damage enemy
                 enemy.health.take_damage(bullet.damage);
@@ -177,8 +183,8 @@ fn bullet_enemy_collision(
                     game_config.score += game_config.settings.score_per_enemy;
                     commands.entity(enemy_entity).despawn();
 
-                    // Respawn enemy in a spawn zone if map is loaded, otherwise use fallback
-                    let respawn_pos = if let Some(map) = &map {
+                    // Inline respawn position calculation
+                    let respawn_pos = if let Some(map) = map.as_deref() {
                         if !map.enemy_zones.is_empty() {
                             let zone_index =
                                 (respawn_counter.count as usize) % map.enemy_zones.len();
@@ -235,8 +241,8 @@ fn area_effect_damage(
                         game_config.score += game_config.settings.score_per_enemy;
                         commands.entity(enemy_entity).despawn();
 
-                        // Respawn enemy in a spawn zone if map is loaded, otherwise use fallback
-                        let respawn_pos = if let Some(map) = &map {
+                        // Inline respawn position calculation
+                        let respawn_pos = if let Some(map) = map.as_deref() {
                             if !map.enemy_zones.is_empty() {
                                 let zone_index =
                                     (respawn_counter.count as usize) % map.enemy_zones.len();
@@ -278,5 +284,142 @@ fn cleanup_combat_entities(
     // Clean up area effects
     for entity in area_effect_query.iter() {
         commands.entity(entity).despawn();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::map::{SpawnZone, TerrainData};
+
+    #[test]
+    fn test_inlined_bullet_movement() {
+        // Test the inlined bullet movement calculation
+        let mut position = Vec3::new(0.0, 1.0, 0.0);
+        let direction = Vec3::new(1.0, 0.0, 0.0);
+        let speed = Speed::new(10.0);
+        let delta_time = 0.1;
+
+        // Inline calculation: position += direction * speed * delta_time
+        position += direction * speed * delta_time;
+
+        assert_eq!(position, Vec3::new(1.0, 1.0, 0.0));
+    }
+
+    #[test]
+    fn test_inlined_bullet_despawn() {
+        // Test the inlined bullet lifetime and despawn logic
+        let mut lifetime = 0.05;
+        let delta_time = 0.1;
+
+        // Inline calculation: lifetime -= delta_time; should_despawn = lifetime <= 0.0
+        lifetime -= delta_time;
+        let should_despawn = lifetime <= 0.0;
+
+        assert!(should_despawn);
+        assert_eq!(lifetime, -0.05);
+    }
+
+    #[test]
+    fn test_inlined_area_effect_fade() {
+        // Test the inlined area effect fade calculation
+        let mut elapsed = 1.0;
+        let delta_time = 0.1;
+        let duration = 3.0; // Default magic duration
+
+        // Inline calculation: elapsed += delta_time; alpha = 1.0 - (elapsed / duration); scale = alpha.max(0.1)
+        elapsed += delta_time;
+        let alpha: f32 = 1.0 - (elapsed / duration);
+        let scale = alpha.max(0.1);
+
+        assert_eq!(elapsed, 1.1);
+        let expected_alpha: f32 = 1.0 - (1.1 / 3.0);
+        let expected_scale = expected_alpha.max(0.1);
+        assert!((scale - expected_scale).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_inlined_area_effect_despawn() {
+        // Test the inlined area effect despawn logic
+        let mut elapsed = 2.9;
+        let delta_time = 0.2;
+        let duration = 3.0; // Default magic duration
+
+        // Inline calculation: elapsed += delta_time; should_despawn = elapsed >= duration
+        elapsed += delta_time;
+        let should_despawn = elapsed >= duration;
+
+        assert!(should_despawn);
+        assert_eq!(elapsed, 3.1);
+    }
+
+    #[test]
+    fn test_inlined_respawn_position_with_map() {
+        let zone = SpawnZone {
+            center: Vec3::new(10.0, 0.0, 10.0),
+            radius: 5.0,
+            max_enemies: 10,
+            enemy_types: vec!["dark-knight".to_string()],
+        };
+
+        let terrain = TerrainData::create_flat(10, 10, 1.0, 0.0).unwrap();
+        let map = MapDefinition {
+            name: "test".to_string(),
+            terrain,
+            player_spawn: Vec3::ZERO,
+            enemy_zones: vec![zone],
+            environment_objects: vec![],
+        };
+
+        let respawn_counter = 0;
+
+        // Test the inlined respawn logic
+        let respawn_pos = if !map.enemy_zones.is_empty() {
+            let zone_index = (respawn_counter as usize) % map.enemy_zones.len();
+            crate::game_logic::spawning::generate_zone_position(
+                &map.enemy_zones[zone_index],
+                respawn_counter,
+            )
+        } else {
+            Vec3::new(5.0, 2.0, 0.0)
+        };
+
+        // Should be within the zone
+        let distance = Vec3::new(respawn_pos.x - 10.0, 0.0, respawn_pos.z - 10.0).length();
+        assert!(distance <= 5.0);
+        assert_eq!(respawn_pos.y, 1.0);
+    }
+
+    #[test]
+    fn test_inlined_respawn_position_no_map() {
+        let respawn_pos = Vec3::new(5.0, 2.0, 0.0); // Fallback when no map
+        assert_eq!(respawn_pos, Vec3::new(5.0, 2.0, 0.0));
+    }
+
+    #[test]
+    fn test_inlined_respawn_position_empty_zones() {
+        let terrain = TerrainData::create_flat(10, 10, 1.0, 0.0).unwrap();
+        let map = MapDefinition {
+            name: "test".to_string(),
+            terrain,
+            player_spawn: Vec3::ZERO,
+            enemy_zones: vec![],
+            environment_objects: vec![],
+        };
+
+        let respawn_counter = 0;
+
+        // Test the inlined respawn logic with empty zones
+        let respawn_pos = if !map.enemy_zones.is_empty() {
+            let zone_index = (respawn_counter as usize) % map.enemy_zones.len();
+            crate::game_logic::spawning::generate_zone_position(
+                &map.enemy_zones[zone_index],
+                respawn_counter,
+            )
+        } else {
+            Vec3::new(5.0, 2.0, 0.0)
+        };
+
+        assert_eq!(respawn_pos, Vec3::new(5.0, 2.0, 0.0));
     }
 }

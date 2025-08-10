@@ -519,11 +519,11 @@ pub fn should_replan_path(
 
     // Check if destination has changed significantly
     if let Some(destination) = agent.destination {
-        if let Some(last_waypoint) = agent.current_path.last() {
+        if let Some(last_waypoint) = agent.nav_path.final_destination() {
             if last_waypoint.distance(destination) > agent.max_path_distance {
                 return true;
             }
-        } else if !agent.current_path.is_empty() {
+        } else if !agent.nav_path.is_empty() {
             // Path exists but no destination matches - replan
             return true;
         }
@@ -549,13 +549,13 @@ pub fn update_pathfinding_agents(mut agents_query: Query<(&mut PathfindingAgent,
             let distance_2d = current_2d.distance(waypoint_2d);
 
             if distance_2d <= agent.waypoint_reach_distance {
-                let old_index = agent.path_index;
+                let old_index = agent.nav_path.current_index();
                 agent.advance_waypoint();
                 info!(
                     "Waypoint reached! Advanced from index {} to {} (path length: {})",
                     old_index,
-                    agent.path_index,
-                    agent.current_path.len()
+                    agent.nav_path.current_index(),
+                    agent.nav_path.len()
                 );
 
                 // Log next waypoint if it exists
@@ -571,9 +571,9 @@ pub fn update_pathfinding_agents(mut agents_query: Query<(&mut PathfindingAgent,
             }
         } else {
             // Debug logging commented out to reduce console spam
-            // if !agent.current_path.is_empty() {
+            // if !agent.nav_path.is_empty() {
             //     debug!("No current waypoint available (index={}, len={})",
-            //            agent.path_index, agent.current_path.len());
+            //            agent.nav_path.current_index(), agent.nav_path.len());
             // }
         }
     }
@@ -880,8 +880,8 @@ mod tests {
     fn test_pathfinding_agent_new() {
         let agent = PathfindingAgent::new();
 
-        assert!(agent.current_path.is_empty());
-        assert_eq!(agent.path_index, 0);
+        assert!(agent.nav_path.is_empty());
+        assert_eq!(agent.nav_path.current_index(), 0);
         assert!(agent.destination.is_none());
         assert!(!agent.has_path());
     }

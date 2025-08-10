@@ -8,11 +8,16 @@ pub mod resources;
 pub mod terrain;
 pub mod terrain_generation;
 
-pub use components::*;
-pub use game_logic::*;
-pub use map::*;
-pub use pathfinding::*;
+// Selective re-exports for external consumers
+
+// Plugins - main.rs needs all plugins
 pub use plugins::*;
-pub use resources::*;
-pub use terrain::*;
-pub use terrain_generation::*;
+
+// Game logic - examples need errors and some core types
+pub use game_logic::errors::{MinionError, MinionResult};
+
+// Map - examples need core map types
+pub use map::{EnvironmentObject, MapDefinition, SpawnZone, TerrainData};
+
+// Terrain generation - examples need utility functions
+pub use terrain_generation::is_suitable_for_spawning;
