@@ -190,8 +190,8 @@ impl PathGenerator {
 
     fn generate_simple_paths(&mut self, terrain: &TerrainData) -> MinionResult<Vec<Path>> {
         let mut paths = Vec::new();
-        let width = terrain.width as u32;
-        let height = terrain.height as u32;
+        let width = terrain.width;
+        let height = terrain.height;
 
         // Generate a few random paths across the terrain
         for _ in 0..3 {
@@ -226,7 +226,7 @@ impl PathGenerator {
     ) -> Option<Vec<PathPoint>> {
         let result = astar(
             &start,
-            |&(x, z)| self.get_neighbors(x, z, terrain.width as u32, terrain.height as u32),
+            |&(x, z)| self.get_neighbors(x, z, terrain.width, terrain.height),
             |&pos| self.heuristic(pos, end),
             |&pos| self.is_goal(pos, end),
         );
@@ -250,7 +250,7 @@ impl PathGenerator {
     ) -> Option<Vec<PathPoint>> {
         let result = astar(
             &start,
-            |&(x, z)| self.get_neighbors(x, z, terrain.width as u32, terrain.height as u32),
+            |&(x, z)| self.get_neighbors(x, z, terrain.width, terrain.height),
             |&pos| self.simple_heuristic(pos, end),
             |&pos| self.is_goal(pos, end),
         );
@@ -297,14 +297,14 @@ impl PathGenerator {
     }
 
     fn heuristic(&self, pos: (u32, u32), goal: (u32, u32)) -> u32 {
-        let dx = (pos.0 as i32 - goal.0 as i32).abs() as u32;
-        let dz = (pos.1 as i32 - goal.1 as i32).abs() as u32;
+        let dx = (pos.0 as i32 - goal.0 as i32).unsigned_abs();
+        let dz = (pos.1 as i32 - goal.1 as i32).unsigned_abs();
         dx + dz // Manhattan distance
     }
 
     fn simple_heuristic(&self, pos: (u32, u32), goal: (u32, u32)) -> u32 {
-        let dx = (pos.0 as i32 - goal.0 as i32).abs() as u32;
-        let dz = (pos.1 as i32 - goal.1 as i32).abs() as u32;
+        let dx = (pos.0 as i32 - goal.0 as i32).unsigned_abs();
+        let dz = (pos.1 as i32 - goal.1 as i32).unsigned_abs();
         ((dx * dx + dz * dz) as f32).sqrt() as u32 // Euclidean distance
     }
 
@@ -321,7 +321,7 @@ impl PathGenerator {
             for (z, &biome_type) in row.iter().enumerate() {
                 biome_points
                     .entry(biome_type)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push((x as u32, z as u32));
             }
         }
@@ -347,7 +347,7 @@ impl PathGenerator {
             for (z, &biome_type) in row.iter().enumerate() {
                 regions
                     .entry(biome_type)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push((x as u32, z as u32));
             }
         }
@@ -382,5 +382,422 @@ impl PathGenerator {
         }
 
         junctions
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::terrain::biomes::{BiomeBlend, BiomeMap};
+
+    // Helper functions for creating test data
+    fn create_test_terrain(width: u32, height: u32) -> TerrainData {
+        let size = (width * height) as usize;
+        TerrainData {
+            width,
+            height,
+            heights: vec![0.0; size],
+            scale: 1.0,
+        }
+    }
+
+    fn create_test_biome_data(width: u32, height: u32) -> BiomeData {
+        let biome_map = vec![vec![BiomeType::Plains; height as usize]; width as usize];
+        let blend_map = BiomeMap {
+            width,
+            height,
+            blends: vec![BiomeBlend::single(BiomeType::Plains); (width * height) as usize],
+            scale: 1.0,
+        };
+        BiomeData {
+            biome_map,
+            blend_map,
+        }
+    }
+
+    fn create_mixed_biome_data(width: u32, height: u32) -> BiomeData {
+        let mut biome_map = vec![vec![BiomeType::Plains; height as usize]; width as usize];
+
+        // Create different biome regions
+        for x in 0..width as usize {
+            for z in 0..height as usize {
+                biome_map[x][z] = match (x * 2 / width as usize, z * 2 / height as usize) {
+                    (0, 0) => BiomeType::Plains,
+                    (0, 1) => BiomeType::Forest,
+                    (1, 0) => BiomeType::Mountains,
+                    (1, 1) => BiomeType::Desert,
+                    _ => BiomeType::Plains,
+                };
+            }
+        }
+
+        let blend_map = BiomeMap {
+            width,
+            height,
+            blends: vec![BiomeBlend::single(BiomeType::Plains); (width * height) as usize],
+            scale: 1.0,
+        };
+
+        BiomeData {
+            biome_map,
+            blend_map,
+        }
+    }
+
+    // Property Tests (manual property verification)
+
+    #[test]
+    fn property_path_connectivity() {
+        let mut generator = PathGenerator::new(PathGenerationConfig::default(), 42);
+        let terrain = create_test_terrain(50, 50);
+        let biomes = create_mixed_biome_data(50, 50);
+
+        let network = generator
+            .generate_path_network(&terrain, Some(&biomes))
+            .unwrap();
+
+        // Property: All paths should have at least 2 points (start and end)
+        for path in &network.paths {
+            assert!(path.points.len() >= 2, "Path should have at least 2 points");
+        }
+
+        // Property: Path points should form a connected sequence
+        for path in &network.paths {
+            for window in path.points.windows(2) {
+                let p1 = &window[0];
+                let p2 = &window[1];
+                let distance =
+                    ((p1.x as i32 - p2.x as i32).abs() + (p1.z as i32 - p2.z as i32).abs()) as u32;
+                assert!(
+                    distance <= 2,
+                    "Adjacent path points should be neighbors (distance <= 2)"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn property_boundary_constraints() {
+        let mut generator = PathGenerator::new(PathGenerationConfig::default(), 42);
+        let terrain = create_test_terrain(20, 20);
+        let biomes = create_test_biome_data(20, 20);
+
+        let network = generator
+            .generate_path_network(&terrain, Some(&biomes))
+            .unwrap();
+
+        // Property: All path points should be within terrain bounds
+        for path in &network.paths {
+            for point in &path.points {
+                assert!(
+                    point.x < terrain.width,
+                    "Path point x should be within terrain width"
+                );
+                assert!(
+                    point.z < terrain.height,
+                    "Path point z should be within terrain height"
+                );
+            }
+        }
+
+        // Property: All junction points should be within terrain bounds
+        for junction in &network.junctions {
+            assert!(
+                junction.x < terrain.width,
+                "Junction x should be within terrain width"
+            );
+            assert!(
+                junction.z < terrain.height,
+                "Junction z should be within terrain height"
+            );
+        }
+    }
+
+    #[test]
+    fn property_deterministic_generation() {
+        let config = PathGenerationConfig::default();
+        let terrain = create_test_terrain(30, 30);
+        let biomes = create_test_biome_data(30, 30);
+
+        // Generate with same seed twice
+        let mut gen1 = PathGenerator::new(config.clone(), 123);
+        let mut gen2 = PathGenerator::new(config, 123);
+
+        let network1 = gen1.generate_path_network(&terrain, Some(&biomes)).unwrap();
+        let network2 = gen2.generate_path_network(&terrain, Some(&biomes)).unwrap();
+
+        // Property: Same seed should produce identical results
+        assert_eq!(
+            network1.paths.len(),
+            network2.paths.len(),
+            "Same seed should produce same number of paths"
+        );
+
+        for (path1, path2) in network1.paths.iter().zip(network2.paths.iter()) {
+            assert_eq!(path1.path_type, path2.path_type, "Path types should match");
+            assert_eq!(
+                path1.points.len(),
+                path2.points.len(),
+                "Path lengths should match"
+            );
+
+            for (p1, p2) in path1.points.iter().zip(path2.points.iter()) {
+                assert_eq!(p1.x, p2.x, "Path point x coordinates should match");
+                assert_eq!(p1.z, p2.z, "Path point z coordinates should match");
+            }
+        }
+    }
+
+    #[test]
+    fn property_path_smoothness() {
+        let mut generator = PathGenerator::new(PathGenerationConfig::default(), 42);
+        let terrain = create_test_terrain(40, 40);
+        let biomes = create_test_biome_data(40, 40);
+
+        let network = generator
+            .generate_path_network(&terrain, Some(&biomes))
+            .unwrap();
+
+        // Property: Adjacent path points should be reasonably close
+        for path in &network.paths {
+            for window in path.points.windows(2) {
+                let p1 = &window[0];
+                let p2 = &window[1];
+                let dx = (p1.x as i32 - p2.x as i32).abs();
+                let dz = (p1.z as i32 - p2.z as i32).abs();
+
+                // Should be within 8-connected neighborhood
+                assert!(
+                    dx <= 1 && dz <= 1,
+                    "Adjacent path points should be in 8-connected neighborhood"
+                );
+            }
+        }
+    }
+
+    // Unit Tests
+
+    #[test]
+    fn test_path_generation_config_default() {
+        let config = PathGenerationConfig::default();
+        assert_eq!(config.main_roads, DEFAULT_MAIN_ROADS);
+        assert_eq!(config.trails_per_biome, DEFAULT_TRAILS_PER_BIOME);
+        assert_eq!(config.min_path_length, DEFAULT_MIN_PATH_LENGTH);
+        assert_eq!(config.max_slope_gradient, DEFAULT_MAX_SLOPE_GRADIENT);
+    }
+
+    #[test]
+    fn test_empty_terrain() {
+        let mut generator = PathGenerator::new(PathGenerationConfig::default(), 42);
+        let terrain = create_test_terrain(1, 1);
+        let biomes = create_test_biome_data(1, 1);
+
+        let network = generator
+            .generate_path_network(&terrain, Some(&biomes))
+            .unwrap();
+
+        // Should handle gracefully without crashing
+        assert!(network.paths.is_empty() || network.paths.iter().all(|p| p.points.len() >= 1));
+    }
+
+    #[test]
+    fn test_no_biome_data_fallback() {
+        let mut generator = PathGenerator::new(PathGenerationConfig::default(), 42);
+        let terrain = create_test_terrain(30, 30);
+
+        let network = generator.generate_path_network(&terrain, None).unwrap();
+
+        // Should generate simple paths without biome data
+        // All paths should be trails in fallback mode
+        for path in &network.paths {
+            assert_eq!(
+                path.path_type,
+                PathType::Trail,
+                "Fallback should generate trails"
+            );
+            assert_eq!(path.width, 2.0, "Fallback trails should have width 2.0");
+        }
+    }
+
+    #[test]
+    fn test_heuristic_functions() {
+        let generator = PathGenerator::new(PathGenerationConfig::default(), 42);
+
+        // Test Manhattan distance heuristic
+        let h1 = generator.heuristic((0, 0), (3, 4));
+        assert_eq!(h1, 7, "Manhattan distance should be |3-0| + |4-0| = 7");
+
+        let h2 = generator.heuristic((5, 5), (2, 1));
+        assert_eq!(h2, 7, "Manhattan distance should be |2-5| + |1-5| = 7");
+
+        // Test Euclidean distance heuristic
+        let h3 = generator.simple_heuristic((0, 0), (3, 4));
+        assert_eq!(h3, 5, "Euclidean distance should be sqrt(9+16) = 5");
+
+        let h4 = generator.simple_heuristic((0, 0), (0, 0));
+        assert_eq!(h4, 0, "Distance to self should be 0");
+    }
+
+    #[test]
+    fn test_neighbor_generation() {
+        let generator = PathGenerator::new(PathGenerationConfig::default(), 42);
+
+        // Test center point
+        let neighbors = generator.get_neighbors(5, 5, 10, 10);
+        assert_eq!(neighbors.len(), 8, "Center point should have 8 neighbors");
+
+        // Test corner point
+        let neighbors = generator.get_neighbors(0, 0, 10, 10);
+        assert_eq!(neighbors.len(), 3, "Corner point should have 3 neighbors");
+
+        // Test edge point
+        let neighbors = generator.get_neighbors(0, 5, 10, 10);
+        assert_eq!(neighbors.len(), 5, "Edge point should have 5 neighbors");
+
+        // Test costs are correct
+        let neighbors = generator.get_neighbors(5, 5, 10, 10);
+        let cardinal_neighbors = neighbors
+            .iter()
+            .filter(|(_, cost)| *cost == ASTAR_CARDINAL_COST)
+            .count();
+        let diagonal_neighbors = neighbors
+            .iter()
+            .filter(|(_, cost)| *cost == ASTAR_DIAGONAL_COST)
+            .count();
+
+        assert_eq!(cardinal_neighbors, 4, "Should have 4 cardinal neighbors");
+        assert_eq!(diagonal_neighbors, 4, "Should have 4 diagonal neighbors");
+    }
+
+    #[test]
+    fn test_goal_detection() {
+        let generator = PathGenerator::new(PathGenerationConfig::default(), 42);
+
+        assert!(
+            generator.is_goal((5, 5), (5, 5)),
+            "Point should be goal of itself"
+        );
+        assert!(
+            !generator.is_goal((5, 5), (5, 6)),
+            "Different points should not be goals"
+        );
+    }
+
+    #[test]
+    fn test_biome_center_calculation() {
+        let generator = PathGenerator::new(PathGenerationConfig::default(), 42);
+
+        // Create biome data with known centers
+        let mut biome_map = vec![vec![BiomeType::Ocean; 10]; 10];
+
+        // Create a 3x3 plains region at (1,1) to (3,3)
+        for x in 1..4 {
+            for z in 1..4 {
+                biome_map[x][z] = BiomeType::Plains;
+            }
+        }
+
+        let blend_map = BiomeMap {
+            width: 10,
+            height: 10,
+            blends: vec![BiomeBlend::single(BiomeType::Ocean); 100],
+            scale: 1.0,
+        };
+
+        let biomes = BiomeData {
+            biome_map,
+            blend_map,
+        };
+        let centers = generator.find_biome_centers(&biomes);
+
+        // Should find the center of the plains region
+        assert!(!centers.is_empty(), "Should find biome centers");
+
+        // The center should be around (2, 2) for the 3x3 plains region
+        let plains_center = centers.iter().find(|&&(x, z)| x == 2 && z == 2);
+        assert!(
+            plains_center.is_some(),
+            "Should find plains center at approximately (2, 2)"
+        );
+    }
+
+    #[test]
+    fn test_junction_detection() {
+        let generator = PathGenerator::new(PathGenerationConfig::default(), 42);
+
+        // Create paths that intersect
+        let path1 = Path {
+            points: vec![
+                PathPoint {
+                    x: 0,
+                    z: 5,
+                    elevation: 0.0,
+                },
+                PathPoint {
+                    x: 5,
+                    z: 5,
+                    elevation: 0.0,
+                },
+                PathPoint {
+                    x: 10,
+                    z: 5,
+                    elevation: 0.0,
+                },
+            ],
+            path_type: PathType::MainRoad,
+            width: 4.0,
+        };
+
+        let path2 = Path {
+            points: vec![
+                PathPoint {
+                    x: 5,
+                    z: 0,
+                    elevation: 0.0,
+                },
+                PathPoint {
+                    x: 5,
+                    z: 5,
+                    elevation: 0.0,
+                },
+                PathPoint {
+                    x: 5,
+                    z: 10,
+                    elevation: 0.0,
+                },
+            ],
+            path_type: PathType::Trail,
+            width: 2.0,
+        };
+
+        let path3 = Path {
+            points: vec![
+                PathPoint {
+                    x: 3,
+                    z: 5,
+                    elevation: 0.0,
+                },
+                PathPoint {
+                    x: 5,
+                    z: 5,
+                    elevation: 0.0,
+                },
+                PathPoint {
+                    x: 7,
+                    z: 5,
+                    elevation: 0.0,
+                },
+            ],
+            path_type: PathType::Trail,
+            width: 2.0,
+        };
+
+        let paths = vec![path1, path2, path3];
+        let junctions = generator.find_path_junctions(&paths);
+
+        // Should find junction at (5, 5) where all three paths meet
+        assert_eq!(junctions.len(), 1, "Should find exactly one junction");
+        assert_eq!(junctions[0].x, 5, "Junction should be at x=5");
+        assert_eq!(junctions[0].z, 5, "Junction should be at z=5");
     }
 }

@@ -1,4 +1,4 @@
-use crate::components::{Enemy, Player, ResourceDisplay, ResourceType};
+use crate::components::{Enemy, HasResources, Player, ResourceDisplay, ResourceType};
 use crate::resources::GameState;
 use bevy::app::AppExit;
 use bevy::prelude::*;
@@ -27,6 +27,11 @@ pub fn handle_exit_events(
     }
 }
 
+/// Generic function to get resource values from any entity that implements HasResources
+fn get_resource_values<T: HasResources>(entity: &T, resource_type: ResourceType) -> (f32, f32) {
+    entity.get_resource(resource_type)
+}
+
 /// Shared resource display update function
 /// Updates resource bars for both player HUD and enemy tooltips
 pub fn update_resource_display(
@@ -38,26 +43,37 @@ pub fn update_resource_display(
     texts: &mut Query<&mut Text, Without<ResourceDisplay>>,
     children_query: &Query<&Children>,
 ) {
-    // Get the resource values based on the target entity type
+    // Get the resource values based on the target entity type using the HasResources trait
     let (current, max) = if let Ok(player) = player_query.get(display.target_entity) {
-        // Target is a player
-        match display.resource_type {
-            ResourceType::Health => (player.health.current, player.health.max),
-            ResourceType::Mana => (player.mana.current, player.mana.max),
-            ResourceType::Energy => (player.energy.current, player.energy.max),
-        }
+        get_resource_values(player, display.resource_type)
     } else if let Ok(enemy) = enemy_query.get(display.target_entity) {
-        // Target is an enemy
-        match display.resource_type {
-            ResourceType::Health => (enemy.health.current, enemy.health.max),
-            ResourceType::Mana => (enemy.mana.current, enemy.mana.max),
-            ResourceType::Energy => (enemy.energy.current, enemy.energy.max),
-        }
+        get_resource_values(enemy, display.resource_type)
     } else {
         // Target entity doesn't exist or doesn't have resources
         return;
     };
 
+    update_resource_display_ui(
+        display,
+        display_entity,
+        current,
+        max,
+        bar_fills,
+        texts,
+        children_query,
+    );
+}
+
+/// Generic UI update function that works with any resource values
+fn update_resource_display_ui(
+    display: &ResourceDisplay,
+    display_entity: Entity,
+    current: f32,
+    max: f32,
+    bar_fills: &mut Query<&mut Node, (Without<ResourceDisplay>, Without<Text>)>,
+    texts: &mut Query<&mut Text, Without<ResourceDisplay>>,
+    children_query: &Query<&Children>,
+) {
     // Update the bar fill and text children of this resource display
     if let Ok(children) = children_query.get(display_entity) {
         for child_entity in children.iter() {

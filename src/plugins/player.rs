@@ -1,6 +1,9 @@
 use crate::components::*;
 use crate::game_logic::{
-    MovementConfig, calculate_movement, ray_to_ground_target, validate_target,
+    MovementConfig, PlayerInputConfig, PlayerMovementConfig, PlayerSpawnConfig,
+    adjust_waypoint_y_coordinate, apply_gravity_to_movement, calculate_2d_distance,
+    calculate_movement, calculate_spawn_position, calculate_target_from_ray, select_starting_lod,
+    should_clear_movement_target, validate_component_initialization, validate_mouse_input,
 };
 use crate::map::MapDefinition;
 use crate::pathfinding::{plan_paths, update_pathfinding_agents};
@@ -43,13 +46,28 @@ fn spawn_player(
 ) {
     // Only spawn player if none exists
     if player_query.is_empty() {
+        let spawn_config = PlayerSpawnConfig::default();
+
+        // Validate component initialization early to prevent spawn failures
+        if let Err(e) = validate_component_initialization(&game_config, spawn_config) {
+            error!("Failed to validate player component initialization: {}", e);
+            return;
+        }
+
         // Load all LOD levels for player
         let high_scene = asset_server.load("players/hooded-high.glb#Scene0");
         let med_scene = asset_server.load("players/hooded-med.glb#Scene0");
         let low_scene = asset_server.load("players/hooded-low.glb#Scene0");
 
-        // Determine starting LOD level based on global max setting
-        let starting_level = LodLevel::from_config_string(&game_config.settings.max_lod_level);
+        // Use extracted LOD selection logic
+        let lod_selection = select_starting_lod(&game_config.settings.max_lod_level);
+        if !lod_selection.is_valid {
+            warn!(
+                "Invalid LOD level '{}', using fallback",
+                game_config.settings.max_lod_level
+            );
+        }
+        let starting_level = lod_selection.level;
         let starting_scene = match starting_level {
             LodLevel::Medium => med_scene.clone(),
             LodLevel::Low => low_scene.clone(),
@@ -62,12 +80,13 @@ fn spawn_player(
             map.player_spawn.x, map.player_spawn.y, map.player_spawn.z
         );
 
-        // Use spawn position from map - spawn high above terrain to avoid intersection
-        let spawn_position = Vec3::new(
-            map.player_spawn.x,
-            map.player_spawn.y + 5.0,
-            map.player_spawn.z,
-        ); // +5.0 to spawn well above terrain
+        // Use extracted spawn position calculation
+        let spawn_result = calculate_spawn_position(&map, spawn_config);
+        if !spawn_result.is_valid {
+            error!("Invalid spawn position calculated, aborting player spawn");
+            return;
+        }
+        let spawn_position = spawn_result.position;
 
         info!(
             "Player spawning at position: ({:.2}, {:.2}, {:.2}) - character controller will snap to terrain",
@@ -82,27 +101,30 @@ fn spawn_player(
         let player_entity = commands
             .spawn((
                 SceneRoot(starting_scene),
-                Transform::from_translation(spawn_position).with_scale(Vec3::splat(2.0)),
+                Transform::from_translation(spawn_position)
+                    .with_scale(Vec3::splat(spawn_config.scale)),
                 RigidBody::KinematicPositionBased,
-                Collider::capsule_y(1.0, 0.5), // 2m tall capsule (1m radius + 2*0.5m hemispheres), 0.5m radius
+                Collider::capsule_y(spawn_config.capsule_height, spawn_config.capsule_radius),
                 KinematicCharacterController {
-                    snap_to_ground: Some(CharacterLength::Absolute(2.0)), // Match working example
-                    offset: CharacterLength::Absolute(0.01), // Match working example - smaller gap
-                    max_slope_climb_angle: 45.0_f32.to_radians(),
-                    min_slope_slide_angle: 30.0_f32.to_radians(),
+                    snap_to_ground: Some(CharacterLength::Absolute(
+                        spawn_config.snap_to_ground_distance,
+                    )),
+                    offset: CharacterLength::Absolute(spawn_config.controller_offset),
+                    max_slope_climb_angle: spawn_config.max_slope_climb_angle,
+                    min_slope_slide_angle: spawn_config.min_slope_slide_angle,
                     slide: true,                           // Enable sliding on slopes
                     apply_impulse_to_dynamic_bodies: true, // Better physics interaction
                     ..default()
                 },
                 Player {
                     move_target: None,
-                    speed: Speed::new(game_config.settings.player_movement_speed),
-                    health: HealthPool::new_full(game_config.settings.player_max_health),
-                    mana: ManaPool::new_full(game_config.settings.player_max_mana),
-                    energy: EnergyPool::new_full(game_config.settings.player_max_energy),
+                    speed: Speed::new(game_config.settings.player_movement_speed.get()),
+                    health: HealthPool::new_full(game_config.settings.player_max_health.get()),
+                    mana: ManaPool::new_full(game_config.settings.player_max_mana.get()),
+                    energy: EnergyPool::new_full(game_config.settings.player_max_energy.get()),
                 },
                 PathfindingAgent {
-                    agent_radius: 0.5, // Match the collider radius
+                    agent_radius: spawn_config.agent_radius,
                     ..PathfindingAgent::default()
                 },
                 LodEntity {
@@ -126,42 +148,65 @@ fn handle_player_input(
     camera_query: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
 ) {
     if mouse_button.just_pressed(MouseButton::Left) {
-        let window = windows
-            .single()
-            .expect("Primary window should always exist when game is running");
-        if let Some(cursor_pos) = window.cursor_position() {
-            let (camera, camera_transform) = camera_query
-                .single()
-                .expect("Camera3d should always exist when game is running");
+        let input_config = PlayerInputConfig::default();
 
-            if let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_pos) {
-                for (player_transform, mut player, mut pathfinding_agent) in player_query.iter_mut()
-                {
-                    let player_y = player_transform.translation.y;
-                    if let Some(target) = ray_to_ground_target(ray.origin, *ray.direction, player_y)
-                    {
-                        if validate_target(player_transform.translation, target) {
-                            // Set pathfinding destination for intelligent pathfinding
-                            pathfinding_agent.destination = Some(target);
-                            // Keep fallback behavior by also setting player.move_target
-                            player.move_target = Some(target);
-                            info!(
-                                "Pathfinding target set: ({:.2}, {:.2}, {:.2})",
-                                target.x, target.y, target.z
-                            );
-                        } else {
-                            warn!(
-                                "Invalid target: ({:.2}, {:.2}, {:.2})",
-                                target.x, target.y, target.z
-                            );
-                        }
-                    } else {
-                        warn!("Could not calculate ground target");
-                    }
-                }
-            } else {
-                warn!("Could not get ray from camera");
+        // Use extracted input validation
+        let has_window = !windows.is_empty();
+        let has_camera = !camera_query.is_empty();
+
+        let window = match windows.get_single() {
+            Ok(w) => w,
+            Err(_) => {
+                warn!("Input validation failed: Primary window not found");
+                return;
             }
+        };
+
+        let cursor_pos = window.cursor_position();
+
+        let validation = validate_mouse_input(has_window, has_camera, cursor_pos);
+        if !validation.is_valid {
+            if let Some(error_msg) = validation.error_message {
+                warn!("Input validation failed: {}", error_msg);
+            }
+            return;
+        }
+
+        // Safe to unwrap after validation
+        let cursor_pos = cursor_pos.unwrap();
+
+        let (camera, camera_transform) = match camera_query.get_single() {
+            Ok(result) => result,
+            Err(_) => {
+                warn!("Could not get camera after validation");
+                return;
+            }
+        };
+        if let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_pos) {
+            for (player_transform, mut player, mut pathfinding_agent) in player_query.iter_mut() {
+                let player_y = player_transform.translation.y;
+
+                // Use extracted target calculation
+                let target_result =
+                    calculate_target_from_ray(ray.origin, *ray.direction, player_y, input_config);
+
+                if target_result.is_valid {
+                    if let Some(target) = target_result.target {
+                        // Set pathfinding destination for intelligent pathfinding
+                        pathfinding_agent.destination = Some(target);
+                        // Keep fallback behavior by also setting player.move_target
+                        player.move_target = Some(target);
+                        info!(
+                            "Pathfinding target set: ({:.2}, {:.2}, {:.2})",
+                            target.x, target.y, target.z
+                        );
+                    }
+                } else if let Some(error_msg) = target_result.error_message {
+                    warn!("Target calculation failed: {}", error_msg);
+                }
+            }
+        } else {
+            warn!("Could not get ray from camera");
         }
     }
 }
@@ -179,14 +224,16 @@ fn move_player(
     for (mut transform, mut player, mut controller, pathfinding_agent) in player_query.iter_mut() {
         let config = MovementConfig {
             speed: player.speed.0,
-            stopping_distance: game_config.settings.player_stopping_distance,
-            slowdown_distance: game_config.settings.player_slowdown_distance,
+            stopping_distance: game_config.settings.player_stopping_distance.get(),
+            slowdown_distance: game_config.settings.player_slowdown_distance.get(),
             delta_time: time.delta_secs(),
         };
 
         // Use pathfinding waypoint as primary target, fallback to direct target
         let pathfinding_waypoint = pathfinding_agent.current_waypoint();
         let mut movement_target = pathfinding_waypoint.or(player.move_target);
+
+        let movement_config = PlayerMovementConfig::default();
 
         // Debug logging for pathfinding usage
         if let Some(waypoint) = pathfinding_waypoint {
@@ -195,23 +242,20 @@ fn move_player(
                 waypoint.x, waypoint.y, waypoint.z
             );
 
-            // Ensure waypoint Y coordinate matches player's movement plane
-            // This fixes issues where pathfinding uses terrain height but player moves above it
+            // Use extracted Y coordinate adjustment logic
             if let Some(adjusted_waypoint) = movement_target {
                 let player_y = transform.translation.y;
-                let adjusted_y = if (adjusted_waypoint.y - player_y).abs() > 2.0 {
-                    // If waypoint Y is very different from player Y, use player Y
-                    player_y
-                } else {
-                    adjusted_waypoint.y
-                };
+                let adjustment =
+                    adjust_waypoint_y_coordinate(adjusted_waypoint, player_y, movement_config);
 
-                // Update movement target with corrected Y coordinate
-                movement_target = Some(Vec3::new(
-                    adjusted_waypoint.x,
-                    adjusted_y,
-                    adjusted_waypoint.z,
-                ));
+                if adjustment.was_adjusted {
+                    debug!(
+                        "Adjusted waypoint Y from {:.1} to {:.1}",
+                        adjusted_waypoint.y, adjustment.adjusted_target.y
+                    );
+                }
+
+                movement_target = Some(adjustment.adjusted_target);
             }
         } else if player.move_target.is_some() {
             debug!("Using direct movement target (no pathfinding waypoint)");
@@ -225,14 +269,11 @@ fn move_player(
 
         // Override stopping logic for pathfinding waypoints - we should always move to waypoints
         let (should_move, final_movement_vector) = if pathfinding_waypoint.is_some() {
-            // FIXED: Use 2D distance calculation to match movement system (Fix 1)
-            // This resolves the bug where pathfinding used 3D distance while movement used 2D distance
+            // Use extracted 2D distance calculation for consistency
             let distance = movement_target.map_or(0.0, |target| {
-                let current_2d = Vec3::new(transform.translation.x, 0.0, transform.translation.z);
-                let target_2d = Vec3::new(target.x, 0.0, target.z);
-                current_2d.distance(target_2d)
+                calculate_2d_distance(transform.translation, target)
             });
-            let should_move_to_waypoint = distance > 0.1;
+            let should_move_to_waypoint = distance > movement_config.pathfinding_distance_threshold;
 
             // CRITICAL FIX: Recalculate movement vector when overriding should_move
             let movement_vector = if should_move_to_waypoint && movement_target.is_some() {
@@ -254,13 +295,14 @@ fn move_player(
         // Debug logging removed - movement is working correctly
 
         if should_move {
-            // Add gravity component to movement
-            let movement_with_gravity = Vec3::new(
-                final_movement_vector.x,
-                -3.0 * time.delta_secs(),
-                final_movement_vector.z,
+            // Use extracted gravity application
+            let gravity_result = apply_gravity_to_movement(
+                final_movement_vector,
+                true,
+                time.delta_secs(),
+                movement_config,
             );
-            controller.translation = Some(movement_with_gravity);
+            controller.translation = Some(gravity_result.movement_vector);
 
             debug!(
                 "Moving: distance={:.2} speed_factor={:.2}",
@@ -272,22 +314,31 @@ fn move_player(
                 transform.look_at(rotation_target, Vec3::Y);
             }
         } else {
-            // Clear fallback target only if pathfinding has no destination and no waypoints
-            if pathfinding_agent.destination.is_none()
-                && pathfinding_agent.current_waypoint().is_none()
-            {
-                // Only log when we actually clear a target (not every frame)
-                if player.move_target.is_some() {
-                    player.move_target = None;
+            // Use extracted target clearing logic
+            let clearing_decision = should_clear_movement_target(
+                pathfinding_agent.destination.is_some(),
+                pathfinding_agent.current_waypoint().is_some(),
+                player.move_target.is_some(),
+                calculation.distance_to_target,
+                game_config.settings.player_stopping_distance.get(),
+            );
+
+            if clearing_decision.should_clear {
+                player.move_target = None;
+                if let Some(reason) = clearing_decision.reason {
                     info!(
-                        "All targets reached, stopping movement (distance {:.2} <= stopping distance {:.2})",
+                        "{} - stopping movement (distance {:.2} <= stopping distance {:.2})",
+                        reason,
                         calculation.distance_to_target,
-                        game_config.settings.player_stopping_distance
+                        game_config.settings.player_stopping_distance.get()
                     );
                 }
             }
-            // Apply gravity when stationary
-            controller.translation = Some(Vec3::new(0.0, -3.0 * time.delta_secs(), 0.0));
+
+            // Use extracted gravity application for stationary state
+            let gravity_result =
+                apply_gravity_to_movement(Vec3::ZERO, false, time.delta_secs(), movement_config);
+            controller.translation = Some(gravity_result.movement_vector);
         }
     }
 }

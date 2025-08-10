@@ -9,13 +9,13 @@ pub mod tooltips;
 pub mod ui;
 pub mod ui_common;
 
-pub use combat::*;
-pub use egui_ui::*;
-pub use enemy::*;
-pub use environment::*;
-pub use map_loader::*;
-pub use player::*;
-pub use scene::*;
-pub use tooltips::*;
-pub use ui::*;
-pub use ui_common::*;
+// Re-export all plugin types for main.rs
+pub use combat::CombatPlugin;
+pub use egui_ui::EguiUiPlugin;
+pub use enemy::EnemyPlugin;
+pub use environment::EnvironmentPlugin;
+pub use map_loader::MapLoaderPlugin;
+pub use player::PlayerPlugin;
+pub use scene::ScenePlugin;
+pub use tooltips::TooltipPlugin;
+pub use ui::UiPlugin;

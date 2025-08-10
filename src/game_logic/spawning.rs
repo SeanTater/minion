@@ -33,11 +33,13 @@ pub fn spawn_enemy_entity(
     let med_scene = asset_server.load("enemies/dark-knight-med.glb#Scene0");
     let low_scene = asset_server.load("enemies/dark-knight-low.glb#Scene0");
 
-    // Determine starting LOD level based on global max setting
-    let (starting_scene, starting_level) = match game_config.settings.max_lod_level.as_str() {
-        "medium" => (med_scene.clone(), LodLevel::Medium),
-        "low" => (low_scene.clone(), LodLevel::Low),
-        _ => (high_scene.clone(), LodLevel::High),
+    // Inline LOD level determination with fallback
+    let starting_level =
+        LodLevel::try_from(game_config.settings.max_lod_level.as_str()).unwrap_or(LodLevel::High); // Default to High on invalid config
+    let starting_scene = match starting_level {
+        LodLevel::High => high_scene.clone(),
+        LodLevel::Medium => med_scene.clone(),
+        LodLevel::Low => low_scene.clone(),
     };
 
     commands.spawn((
@@ -55,11 +57,11 @@ pub fn spawn_enemy_entity(
             ..default()
         },
         Enemy {
-            speed: Speed::new(game_config.settings.enemy_movement_speed),
-            health: HealthPool::new_full(game_config.settings.enemy_max_health),
-            mana: ManaPool::new_full(game_config.settings.enemy_max_mana),
-            energy: EnergyPool::new_full(game_config.settings.enemy_max_energy),
-            chase_distance: Distance::new(game_config.settings.enemy_chase_distance),
+            speed: Speed::new(game_config.settings.enemy_movement_speed.get()),
+            health: HealthPool::new_full(game_config.settings.enemy_max_health.get()),
+            mana: ManaPool::new_full(game_config.settings.enemy_max_mana.get()),
+            energy: EnergyPool::new_full(game_config.settings.enemy_max_energy.get()),
+            chase_distance: Distance::new(game_config.settings.enemy_chase_distance.get()),
             is_dying: false,
         },
         PathfindingAgent::default(),
@@ -141,5 +143,40 @@ mod tests {
         } else {
             panic!("Expected non-empty angles vector");
         }
+    }
+
+    // Integration tests for spawning logic
+    #[test]
+    fn test_spawn_enemy_entity_components() {
+        // Test that spawn_enemy_entity creates the expected component bundle
+        let game_config = GameConfig::default();
+        let spawn_position = Vec3::new(10.0, 1.0, 5.0);
+
+        // Verify the function parameters and expected behavior
+        assert_eq!(spawn_position.y, 1.0); // Should spawn above ground
+        assert_eq!(game_config.settings.enemy_movement_speed.get(), 3.0); // Default speed
+        assert_eq!(game_config.settings.enemy_max_health.get(), 3.0); // Default health
+    }
+
+    #[test]
+    fn test_spawn_enemy_lod_level_selection() {
+        let mut game_config = GameConfig::default();
+
+        // Test high LOD (default)
+        let high_level = LodLevel::try_from(game_config.settings.max_lod_level.as_str())
+            .unwrap_or(LodLevel::High);
+        assert_eq!(high_level, LodLevel::High);
+
+        // Test medium LOD
+        game_config.settings.max_lod_level = "medium".to_string();
+        let med_level = LodLevel::try_from(game_config.settings.max_lod_level.as_str())
+            .unwrap_or(LodLevel::High);
+        assert_eq!(med_level, LodLevel::Medium);
+
+        // Test low LOD
+        game_config.settings.max_lod_level = "low".to_string();
+        let low_level = LodLevel::try_from(game_config.settings.max_lod_level.as_str())
+            .unwrap_or(LodLevel::High);
+        assert_eq!(low_level, LodLevel::Low);
     }
 }

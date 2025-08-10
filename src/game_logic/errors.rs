@@ -20,8 +20,8 @@ pub enum MinionError {
     #[error("Config file not found at path: {path}")]
     ConfigFileNotFound { path: PathBuf },
 
-    #[error("Invalid configuration values")]
-    InvalidConfig,
+    #[error("Invalid configuration: {reason}")]
+    InvalidConfig { reason: String },
 
     // Game-related errors
     #[error("Invalid spawn position: {position:?}")]
