@@ -50,7 +50,7 @@ pub fn spawn_enemy_entity(
             offset: CharacterLength::Absolute(0.1), // Small gap for numerical stability
             max_slope_climb_angle: 45.0_f32.to_radians(),
             min_slope_slide_angle: 30.0_f32.to_radians(),
-            slide: true, // Enable sliding on slopes
+            slide: true,                           // Enable sliding on slopes
             apply_impulse_to_dynamic_bodies: true, // Better physics interaction
             ..default()
         },
@@ -62,6 +62,7 @@ pub fn spawn_enemy_entity(
             chase_distance: Distance::new(game_config.settings.enemy_chase_distance),
             is_dying: false,
         },
+        PathfindingAgent::default(),
         LodEntity {
             current_level: starting_level,
             high_handle: high_scene.clone(),

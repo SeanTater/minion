@@ -77,6 +77,26 @@ cargo clippy           # Linting
 cargo fmt              # Code formatting
 ```
 
+### Pre-commit Setup
+```bash
+# Install cargo-llvm-cov for coverage (optional but recommended)
+cargo install cargo-llvm-cov
+
+# Install pre-commit hooks
+uv tool run pre-commit install
+
+# Run hooks manually on all files
+uv tool run pre-commit run --all-files
+```
+
+Pre-commit hooks include:
+- **rustfmt**: Code formatting
+- **clippy**: Linting with all targets and features
+- **cargo test**: Run all tests
+- **coverage check**: Ensure 85%+ code coverage (requires cargo-llvm-cov)
+- **trailing whitespace**: Remove trailing whitespace
+- **file fixers**: End-of-file and merge conflict checks
+
 ### Asset Management (Git LFS)
 - **Automatic**: All 3D models, textures, audio, fonts tracked via LFS
 - **Workflow**: Add to `assets/` → `git add` → `git commit` → `git push`

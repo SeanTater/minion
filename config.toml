@@ -15,7 +15,7 @@ score = 0        # Current high score
 # Basic player stats
 player_movement_speed = 15.0     # Base movement speed (units/second)
 player_max_health = 100.0        # Maximum health points
-player_max_mana = 50.0           # Maximum mana points  
+player_max_mana = 50.0           # Maximum mana points
 player_max_energy = 100.0        # Maximum energy points
 
 # Player Movement - These control how the player moves and feels
@@ -23,7 +23,7 @@ player_stopping_distance = 0.5       # Distance from target before stopping (low
 player_slowdown_distance = 2.0       # Distance to start slowing down (higher = smoother approach)
 
 # =============================================================================
-# ENEMY SETTINGS  
+# ENEMY SETTINGS
 # =============================================================================
 
 # Basic enemy stats
@@ -45,7 +45,7 @@ enemy_lod_distance_low = 15.0        # Distance to switch from medium to low det
 
 # Enemy spawning
 enemy_spawn_distance_min = 5.0       # Minimum distance to spawn enemies from player
-enemy_spawn_distance_max = 10.5      # Maximum distance to spawn enemies from player  
+enemy_spawn_distance_max = 10.5      # Maximum distance to spawn enemies from player
 score_per_enemy = 10                 # Points awarded per enemy killed
 
 # =============================================================================
@@ -63,7 +63,7 @@ magic_damage_per_second = 150.0      # Magic area damage per second
 magic_area_radius = 3.0              # Magic area effect radius
 magic_area_duration = 2.0            # How long magic areas last (seconds)
 
-# Area Effect Poison  
+# Area Effect Poison
 poison_damage_per_second = 80.0      # Poison area damage per second
 poison_area_radius = 4.0             # Poison area effect radius
 poison_area_duration = 4.0           # How long poison areas last (seconds)
@@ -97,7 +97,7 @@ ambient_light_brightness = 300.0     # Overall scene brightness
 
 # UI Colors (RGB values from 0.0 to 1.0)
 health_bar_color = [0.8, 0.2, 0.2]  # Red health bars
-mana_bar_color = [0.2, 0.2, 0.8]    # Blue mana bars  
+mana_bar_color = [0.2, 0.2, 0.8]    # Blue mana bars
 energy_bar_color = [0.8, 0.8, 0.2]  # Yellow energy bars
 
 # =============================================================================
@@ -107,7 +107,7 @@ energy_bar_color = [0.8, 0.8, 0.2]  # Yellow energy bars
 # Want more responsive movement?
 # - Decrease player_stopping_distance (try 0.2-0.4)
 
-# Want more challenging enemies?  
+# Want more challenging enemies?
 # - Increase enemy_speed_multiplier (try 0.9-1.2)
 # - Decrease enemy_stopping_distance (try 0.8-1.2)
 

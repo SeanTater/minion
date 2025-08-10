@@ -35,23 +35,28 @@ pub fn generate_dark_name() -> String {
     match rng.gen_range(0..3) {
         0 => {
             // Prefix + Suffix format
-            let prefix = DARK_PREFIXES.choose(&mut rng)
+            let prefix = DARK_PREFIXES
+                .choose(&mut rng)
                 .expect("DARK_PREFIXES should never be empty");
-            let suffix = DARK_SUFFIXES.choose(&mut rng)
+            let suffix = DARK_SUFFIXES
+                .choose(&mut rng)
                 .expect("DARK_SUFFIXES should never be empty");
             format!("{prefix}{suffix}")
         }
         1 => {
             // Simple name + title format
-            let prefix = DARK_PREFIXES.choose(&mut rng)
+            let prefix = DARK_PREFIXES
+                .choose(&mut rng)
                 .expect("DARK_PREFIXES should never be empty");
-            let title = DARK_TITLES.choose(&mut rng)
+            let title = DARK_TITLES
+                .choose(&mut rng)
                 .expect("DARK_TITLES should never be empty");
             format!("{prefix} {title}")
         }
         _ => {
             // Single title format
-            DARK_TITLES.choose(&mut rng)
+            DARK_TITLES
+                .choose(&mut rng)
                 .expect("DARK_TITLES should never be empty")
                 .to_string()
         }

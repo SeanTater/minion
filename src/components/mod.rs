@@ -227,6 +227,26 @@ pub enum LodLevel {
     Low,    // Low-poly model
 }
 
+impl LodLevel {
+    /// Parse LOD level from config string, defaulting to High for invalid values
+    pub fn from_config_string(config_str: &str) -> Self {
+        match config_str {
+            "medium" => LodLevel::Medium,
+            "low" => LodLevel::Low,
+            _ => LodLevel::High, // Default to high if invalid string
+        }
+    }
+
+    /// Apply global max LOD level cap to a desired LOD level
+    pub fn apply_max_cap(desired: LodLevel, max_cap: LodLevel) -> LodLevel {
+        match (desired, max_cap) {
+            (LodLevel::High, LodLevel::Medium) | (LodLevel::High, LodLevel::Low) => max_cap,
+            (LodLevel::Medium, LodLevel::Low) => LodLevel::Low,
+            _ => desired,
+        }
+    }
+}
+
 #[derive(Component)]
 pub struct LodEntity {
     pub current_level: LodLevel,
@@ -333,6 +353,80 @@ impl AreaEffectType {
 pub struct AreaEffect {
     pub effect_type: AreaEffectType,
     pub elapsed: f32,
+}
+
+/// Pathfinding agent component that can be used by both players and enemies
+#[derive(Component)]
+pub struct PathfindingAgent {
+    /// Current path as a series of waypoints in world coordinates
+    pub current_path: Vec<Vec3>,
+    /// Index of the next waypoint to reach in the current path
+    pub path_index: usize,
+    /// Final destination for this agent
+    pub destination: Option<Vec3>,
+    /// Time when the path was last recalculated
+    pub last_replan_time: f32,
+    /// Minimum time between path recalculations (seconds)
+    pub replan_interval: f32,
+    /// Distance threshold to consider a waypoint reached
+    pub waypoint_reach_distance: f32,
+    /// Maximum distance the agent can travel before replanning
+    pub max_path_distance: f32,
+    /// Agent physical radius used for planning (per-agent)
+    pub agent_radius: f32,
+}
+
+impl PathfindingAgent {
+    /// Create a new pathfinding agent with default settings
+    pub fn new() -> Self {
+        Self {
+            current_path: Vec::new(),
+            path_index: 0,
+            destination: None,
+            last_replan_time: 0.0,
+            replan_interval: 0.5,         // Replan every 0.5 seconds
+            waypoint_reach_distance: 1.0, // 1.0 units - works better with spaced waypoints
+            max_path_distance: 50.0,      // Replan if destination changes by more than 50 units
+            agent_radius: 0.5,            // Default per-agent radius
+        }
+    }
+}
+
+impl Default for PathfindingAgent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PathfindingAgent {
+    /// Get the current waypoint this agent is moving towards
+    pub fn current_waypoint(&self) -> Option<Vec3> {
+        self.current_path.get(self.path_index).copied()
+    }
+
+    /// Check if the agent has a valid path to follow
+    pub fn has_path(&self) -> bool {
+        !self.current_path.is_empty() && self.path_index < self.current_path.len()
+    }
+
+    /// Clear the current path
+    pub fn clear_path(&mut self) {
+        self.current_path.clear();
+        self.path_index = 0;
+    }
+
+    /// Set a new path for the agent
+    pub fn set_path(&mut self, path: Vec<Vec3>) {
+        self.current_path = path;
+        self.path_index = 0;
+    }
+
+    /// Advance to the next waypoint in the path
+    pub fn advance_waypoint(&mut self) {
+        if self.path_index < self.current_path.len() {
+            self.path_index += 1;
+        }
+    }
 }
 
 #[cfg(test)]

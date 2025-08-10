@@ -4,13 +4,13 @@ use minion::map::MapDefinition;
 
 mod mapgen {
     pub mod cli_utils;
-    pub mod terrain_builder;
     pub mod map_generator;
+    pub mod terrain_builder;
 }
 
 use mapgen::cli_utils::*;
+use mapgen::map_generator::{MapGenerationConfig, MapGenerator};
 use mapgen::terrain_builder::TerrainBuilder;
-use mapgen::map_generator::{MapGenerator, MapGenerationConfig};
 
 #[derive(Parser, Clone)]
 #[command(name = "mapgen")]
@@ -91,7 +91,7 @@ struct Args {
 
 fn validate_output_path(filename: &str) -> MinionResult<()> {
     use std::path::Path;
-    
+
     // Check for absolute paths which would be problematic
     let path = Path::new(filename);
     if path.is_absolute() {
@@ -102,14 +102,14 @@ fn validate_output_path(filename: &str) -> MinionResult<()> {
             ),
         });
     }
-    
+
     // Check for parent directory traversal attempts
     if filename.contains("..") {
         return Err(minion::game_logic::errors::MinionError::InvalidMapData {
             reason: "Output path cannot contain '..' for security reasons".to_string(),
         });
     }
-    
+
     Ok(())
 }
 
@@ -158,7 +158,7 @@ fn main() -> MinionResult<()> {
 
     // Save and display results
     map.save_to_file(&output_filename)?;
-    
+
     print_map_summary(&map, &output_filename)
 }
 
@@ -169,17 +169,36 @@ fn print_map_summary(map: &MapDefinition, output_filename: &str) -> MinionResult
     println!("Map saved successfully to: {}", full_path.display());
     println!("\nMap summary:");
     println!("  Name: {}", map.name);
-    println!("  Terrain: {}x{} at scale {} (total {} height points)",
-        map.terrain.width, map.terrain.height, map.terrain.scale, map.terrain.heights.len());
+    println!(
+        "  Terrain: {}x{} at scale {} (total {} height points)",
+        map.terrain.width,
+        map.terrain.height,
+        map.terrain.scale,
+        map.terrain.heights.len()
+    );
     println!("  Player spawn: {}", map.player_spawn);
-    println!("  Enemy zones: {} zones with {} total enemy types",
+    println!(
+        "  Enemy zones: {} zones with {} total enemy types",
         map.enemy_zones.len(),
-        map.enemy_zones.iter().map(|z| z.enemy_types.len()).sum::<usize>());
-    println!("  Environment objects: {} objects", map.environment_objects.len());
+        map.enemy_zones
+            .iter()
+            .map(|z| z.enemy_types.len())
+            .sum::<usize>()
+    );
+    println!(
+        "  Environment objects: {} objects",
+        map.environment_objects.len()
+    );
 
     for (i, zone) in map.enemy_zones.iter().enumerate() {
-        println!("    Zone {}: center={}, radius={}, max_enemies={}, types={:?}",
-            i + 1, zone.center, zone.radius, zone.max_enemies, zone.enemy_types);
+        println!(
+            "    Zone {}: center={}, radius={}, max_enemies={}, types={:?}",
+            i + 1,
+            zone.center,
+            zone.radius,
+            zone.max_enemies,
+            zone.enemy_types
+        );
     }
 
     if !map.environment_objects.is_empty() {

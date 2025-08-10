@@ -1,11 +1,11 @@
-use crate::terrain::biomes::{BiomeType, BiomeData};
-use crate::terrain::coordinates::get_height_at_grid;
-use crate::terrain::constants::*;
-use crate::map::TerrainData;
 use crate::game_logic::errors::MinionResult;
+use crate::map::TerrainData;
+use crate::terrain::biomes::{BiomeData, BiomeType};
+use crate::terrain::constants::*;
+use crate::terrain::coordinates::get_height_at_grid;
 use pathfinding::prelude::astar;
-use rand_pcg::Pcg64;
 use rand::{Rng, SeedableRng};
+use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -121,7 +121,9 @@ impl PathGenerator {
                 let start = biome_centers[start_idx];
                 let end = biome_centers[end_idx];
 
-                if let Some(path_points) = self.find_path_astar(terrain, biomes, start, end, PathType::MainRoad) {
+                if let Some(path_points) =
+                    self.find_path_astar(terrain, biomes, start, end, PathType::MainRoad)
+                {
                     roads.push(Path {
                         points: path_points,
                         path_type: PathType::MainRoad,
@@ -164,7 +166,9 @@ impl PathGenerator {
                         _ => PathType::Trail,
                     };
 
-                    if let Some(path_points) = self.find_path_astar(terrain, biomes, start, end, path_type) {
+                    if let Some(path_points) =
+                        self.find_path_astar(terrain, biomes, start, end, path_type)
+                    {
                         let width = match path_type {
                             PathType::MountainPass => DEFAULT_PATH_WIDTH_MOUNTAIN_PASS,
                             PathType::RiverPath => DEFAULT_PATH_WIDTH_RIVER_PATH,
@@ -264,14 +268,27 @@ impl PathGenerator {
 
     fn get_neighbors(&self, x: u32, z: u32, width: u32, height: u32) -> Vec<((u32, u32), u32)> {
         let mut neighbors = Vec::new();
-        let directions = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, 1), (-1, 1), (1, -1)];
+        let directions = [
+            (-1, 0),
+            (1, 0),
+            (0, -1),
+            (0, 1),
+            (-1, -1),
+            (1, 1),
+            (-1, 1),
+            (1, -1),
+        ];
 
         for (dx, dz) in directions {
             let new_x = x as i32 + dx;
             let new_z = z as i32 + dz;
 
             if new_x >= 0 && new_x < width as i32 && new_z >= 0 && new_z < height as i32 {
-                let cost = if dx.abs() + dz.abs() == 2 { ASTAR_DIAGONAL_COST } else { ASTAR_CARDINAL_COST }; // Diagonal vs cardinal
+                let cost = if dx.abs() + dz.abs() == 2 {
+                    ASTAR_DIAGONAL_COST
+                } else {
+                    ASTAR_CARDINAL_COST
+                }; // Diagonal vs cardinal
                 neighbors.push(((new_x as u32, new_z as u32), cost));
             }
         }

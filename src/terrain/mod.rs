@@ -4,13 +4,12 @@ use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology};
 use bevy_rapier3d::prelude::*;
 
-pub mod biomes;
 pub mod biome_generator;
 pub mod biome_integration;
-pub mod path_generator;
-pub mod coordinates;
+pub mod biomes;
 pub mod constants;
-
+pub mod coordinates;
+pub mod path_generator;
 
 /// Generate a 3D mesh from heightmap terrain data
 pub fn generate_terrain_mesh(terrain: &TerrainData) -> MinionResult<Mesh> {
@@ -237,20 +236,20 @@ mod tests {
     #[test]
     fn test_coordinate_transformations() {
         use super::coordinates::*;
-        
+
         // Create a 3x3 terrain with scale 1.0
         let terrain = TerrainData::create_flat(3, 3, 1.0, 0.0).unwrap();
-        
+
         // Test world to grid transformation
         let (grid_x, grid_z) = world_to_grid(&terrain, 0.0, 0.0);
         assert_eq!(grid_x, 1.5); // Center of 3x3 grid
         assert_eq!(grid_z, 1.5);
-        
-        // Test grid to world transformation  
+
+        // Test grid to world transformation
         let world_coord = grid_to_world(&terrain, 1.5, 1.5);
         assert_eq!(world_coord.x, 0.0);
         assert_eq!(world_coord.z, 0.0);
-        
+
         // Test bounds checking
         assert!(is_valid_grid(&terrain, 1.5, 1.5));
         assert!(!is_valid_grid(&terrain, 3.0, 1.5));
@@ -260,7 +259,7 @@ mod tests {
     #[test]
     fn test_height_lookups() {
         use super::coordinates::*;
-        
+
         // Create terrain with known heights
         let heights = vec![
             0.0, 1.0, 2.0, // z=0 row
@@ -268,21 +267,27 @@ mod tests {
             6.0, 7.0, 8.0, // z=2 row
         ];
         let terrain = TerrainData::new(3, 3, heights, 1.0).unwrap();
-        
+
         // Test exact grid lookups
         assert_eq!(get_height_at_grid(&terrain, 0, 0), Some(0.0));
         assert_eq!(get_height_at_grid(&terrain, 1, 1), Some(4.0));
         assert_eq!(get_height_at_grid(&terrain, 2, 2), Some(8.0));
         assert_eq!(get_height_at_grid(&terrain, 3, 0), None); // Out of bounds
-        
+
         // Test nearest neighbor world lookup
         assert_eq!(get_height_at_world_nearest(&terrain, -1.5, -1.5), Some(0.0)); // Corner
         assert_eq!(get_height_at_world_nearest(&terrain, 0.0, 0.0), Some(8.0)); // Center rounds to (2,2)
-        
+
         // Test interpolated world lookup at exact points
-        assert_eq!(get_height_at_world_interpolated(&terrain, -1.5, -1.5), Some(0.0));
-        assert_eq!(get_height_at_world_interpolated(&terrain, 0.0, 0.0), Some(6.0)); // Interpolation at center
-        
+        assert_eq!(
+            get_height_at_world_interpolated(&terrain, -1.5, -1.5),
+            Some(0.0)
+        );
+        assert_eq!(
+            get_height_at_world_interpolated(&terrain, 0.0, 0.0),
+            Some(6.0)
+        ); // Interpolation at center
+
         // Test out of bounds
         assert_eq!(get_height_at_world_interpolated(&terrain, -2.0, 0.0), None);
         assert_eq!(get_height_at_world_nearest(&terrain, 2.0, 0.0), None);

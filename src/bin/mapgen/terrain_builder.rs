@@ -48,7 +48,7 @@ impl TerrainBuilder {
     pub fn build(self) -> MinionResult<TerrainGenerator> {
         let seed = self.seed.unwrap_or_else(rand::random);
         let manual_params = self.has_manual_parameters();
-        
+
         // Try preset first, then fall back to custom algorithm
         if let Some(mut generator) = get_terrain_preset(&self.terrain_type, self.seed) {
             if manual_params {
@@ -82,30 +82,39 @@ impl TerrainBuilder {
         Ok(TerrainGenerator::new(seed, algorithm))
     }
 
-    fn override_preset_params(&self, algorithm: TerrainAlgorithm) -> MinionResult<TerrainAlgorithm> {
+    fn override_preset_params(
+        &self,
+        algorithm: TerrainAlgorithm,
+    ) -> MinionResult<TerrainAlgorithm> {
         match algorithm {
             TerrainAlgorithm::Flat { height } => {
-                println!("Warning: Manual terrain parameters (amplitude, frequency, octaves) are ignored for 'flat' terrain type");
+                println!(
+                    "Warning: Manual terrain parameters (amplitude, frequency, octaves) are ignored for 'flat' terrain type"
+                );
                 Ok(TerrainAlgorithm::Flat { height })
-            },
+            }
             TerrainAlgorithm::Perlin { .. } => {
-                println!("Using custom parameters with '{}' terrain type: amplitude={}, frequency={}, octaves={}", 
-                    self.terrain_type, self.amplitude, self.frequency, self.octaves);
+                println!(
+                    "Using custom parameters with '{}' terrain type: amplitude={}, frequency={}, octaves={}",
+                    self.terrain_type, self.amplitude, self.frequency, self.octaves
+                );
                 Ok(TerrainAlgorithm::Perlin {
                     amplitude: self.amplitude,
                     frequency: self.frequency,
                     octaves: self.octaves,
                 })
-            },
+            }
             TerrainAlgorithm::Ridged { .. } => {
-                println!("Using custom parameters with '{}' terrain type: amplitude={}, frequency={}, octaves={}", 
-                    self.terrain_type, self.amplitude, self.frequency, self.octaves);
+                println!(
+                    "Using custom parameters with '{}' terrain type: amplitude={}, frequency={}, octaves={}",
+                    self.terrain_type, self.amplitude, self.frequency, self.octaves
+                );
                 Ok(TerrainAlgorithm::Ridged {
                     amplitude: self.amplitude,
                     frequency: self.frequency,
                     octaves: self.octaves,
                 })
-            },
+            }
         }
     }
 }
@@ -116,9 +125,8 @@ mod tests {
 
     #[test]
     fn test_terrain_builder_default() {
-        let builder = TerrainBuilder::new("hills".to_string())
-            .seed(Some(12345));
-        
+        let builder = TerrainBuilder::new("hills".to_string()).seed(Some(12345));
+
         let generator = builder.build().unwrap();
         assert_eq!(generator.seed, 12345);
     }
@@ -130,16 +138,20 @@ mod tests {
             .amplitude(100.0)
             .frequency(0.2)
             .octaves(6);
-        
+
         let generator = builder.build().unwrap();
         assert_eq!(generator.seed, 12345);
 
         match generator.algorithm {
-            TerrainAlgorithm::Perlin { amplitude, frequency, octaves } => {
+            TerrainAlgorithm::Perlin {
+                amplitude,
+                frequency,
+                octaves,
+            } => {
                 assert_eq!(amplitude, 100.0);
                 assert_eq!(frequency, 0.2);
                 assert_eq!(octaves, 6);
-            },
+            }
             _ => panic!("Expected Perlin algorithm"),
         }
     }
@@ -151,16 +163,20 @@ mod tests {
             .amplitude(25.0)
             .frequency(0.05)
             .octaves(8);
-        
+
         let generator = builder.build().unwrap();
         assert_eq!(generator.seed, 12345);
 
         match generator.algorithm {
-            TerrainAlgorithm::Perlin { amplitude, frequency, octaves } => {
+            TerrainAlgorithm::Perlin {
+                amplitude,
+                frequency,
+                octaves,
+            } => {
                 assert_eq!(amplitude, 25.0);
                 assert_eq!(frequency, 0.05);
                 assert_eq!(octaves, 8);
-            },
+            }
             _ => panic!("Expected Perlin algorithm"),
         }
     }

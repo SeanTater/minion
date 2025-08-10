@@ -13,7 +13,7 @@ Minion is a Diablo-like ARPG built with Rust/Bevy 0.16, featuring physics-based 
 # Run the game
 cargo run
 
-# Build and check code  
+# Build and check code
 cargo build --release
 cargo check
 cargo fmt
