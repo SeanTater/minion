@@ -212,17 +212,8 @@ fn update_entity_lod(
         };
 
         // Apply global max LOD level cap
-        let max_lod = match game_config.settings.max_lod_level.as_str() {
-            "medium" => LodLevel::Medium,
-            "low" => LodLevel::Low,
-            _ => LodLevel::High, // Default to high if invalid string
-        };
-
-        let required_lod = match (desired_lod, max_lod) {
-            (LodLevel::High, LodLevel::Medium) | (LodLevel::High, LodLevel::Low) => max_lod,
-            (LodLevel::Medium, LodLevel::Low) => LodLevel::Low,
-            _ => desired_lod,
-        };
+        let max_lod = LodLevel::from_config_string(&game_config.settings.max_lod_level);
+        let required_lod = LodLevel::apply_max_cap(desired_lod, max_lod);
 
         // Switch model if LOD level changed
         if lod_entity.current_level != required_lod {

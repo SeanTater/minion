@@ -122,7 +122,9 @@ fn main() -> MinionResult<()> {
     let object_types = parse_object_types(&args.object_types);
     let scale_range = parse_scale_range(&args.object_scale)?;
     let object_density = validate_density(args.objects);
-    let output_filename = args.output.unwrap_or_else(|| format!("{}.bin", args.name));
+    let output_filename = args
+        .output
+        .unwrap_or_else(|| format!("{name}.bin", name = args.name));
 
     // Validate output path early to catch obvious issues
     validate_output_path(&output_filename)?;
