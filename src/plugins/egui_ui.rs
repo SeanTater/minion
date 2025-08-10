@@ -85,9 +85,12 @@ fn main_menu_egui_system(
                     // Show current username if set
                     if !game_config.username.is_empty() {
                         ui.add(egui::Label::new(
-                            egui::RichText::new(format!("Welcome back, {}!", game_config.username))
-                                .size(20.0)
-                                .color(egui::Color32::from_rgb(100, 200, 100)),
+                            egui::RichText::new(format!(
+                                "Welcome back, {username}!",
+                                username = game_config.username
+                            ))
+                            .size(20.0)
+                            .color(egui::Color32::from_rgb(100, 200, 100)),
                         ));
                         ui.add_space(40.0);
                     } else {

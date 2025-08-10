@@ -58,6 +58,18 @@ fn spawn_single_environment_object(
     // Choose collider based on object type
     let collider = get_object_collider(&obj.object_type, &obj.scale);
 
+    // Debug logging for physics obstacles
+    debug!(
+        "Physics obstacle: {} at ({:.1}, {:.1}, {:.1}) scale=({:.1}, {:.1}, {:.1})",
+        obj.object_type,
+        obj.position.x,
+        obj.position.y,
+        obj.position.z,
+        obj.scale.x,
+        obj.scale.y,
+        obj.scale.z
+    );
+
     // Create primitive mesh and material based on object type
     let (mesh, material) =
         create_placeholder_mesh_and_material(&obj.object_type, meshes, materials);
@@ -71,7 +83,7 @@ fn spawn_single_environment_object(
         EnvironmentObjectMarker {
             object_type: obj.object_type.clone(),
         },
-        Name::new(format!("EnvObject_{}", obj.object_type)),
+        Name::new(format!("EnvObject_{obj_type}", obj_type = obj.object_type)),
     ));
 }
 

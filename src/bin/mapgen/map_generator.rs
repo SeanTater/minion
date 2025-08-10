@@ -40,13 +40,17 @@ impl MapGenerator {
     }
 
     pub fn generate(config: MapGenerationConfig) -> MinionResult<MapDefinition> {
-        println!("Generating map: {}", config.name);
+        println!("Generating map: {name}", name = config.name);
         println!(
-            "Terrain size: {}x{} grid cells",
-            config.width, config.height
+            "Terrain size: {width}x{height} grid cells",
+            width = config.width,
+            height = config.height
         );
-        println!("Player spawn: {}", config.player_spawn);
-        println!("Using terrain type (seed: {})", config.generator.seed);
+        println!("Player spawn: {spawn}", spawn = config.player_spawn);
+        println!(
+            "Using terrain type (seed: {seed})",
+            seed = config.generator.seed
+        );
 
         // Generate terrain
         let terrain =
@@ -111,7 +115,10 @@ impl MapGenerator {
         } else {
             Self::generate_spawn_zones(&terrain, corrected_player_spawn, 5)?
         };
-        println!("Generated {} enemy spawn zones", enemy_zones.len());
+        println!(
+            "Generated {count} enemy spawn zones",
+            count = enemy_zones.len()
+        );
 
         // Generate environment objects (biome-aware if biomes enabled)
         let object_seed = config.generator.seed.wrapping_add(42);
